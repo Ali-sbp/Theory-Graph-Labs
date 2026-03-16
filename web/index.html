@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Лаб. 1-2 — Теория графов</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app">
+    <div id="sidebar">
+      <h1 class="app-title">Теория графов</h1>
+
+      <nav id="tab-bar">
+        <button class="tab-btn active" data-tab="0">Граф и Анализ</button>
+        <button class="tab-btn" data-tab="1">Метод Шимбелла</button>
+        <button class="tab-btn" data-tab="2">Поиск маршрута</button>
+        <button class="tab-btn" data-tab="3">Точки сочленения</button>
+        <button class="tab-btn" data-tab="4">Дейкстра (отр. веса)</button>
+        <button class="tab-btn" data-tab="5">Сравнение алгоритмов</button>
+      </nav>
+
+      <div id="tab-panels">
+
+        <!-- ======== Tab 0: Граф и Анализ ======== -->
+        <div class="tab-panel active" id="panel-0">
+          <div class="form-row">
+            <label for="vertexCount">Кол-во вершин:</label>
+            <input type="number" id="vertexCount" min="1" max="100" value="6">
+          </div>
+          <div class="form-row">
+            <label for="paramP">p (степени):</label>
+            <input type="number" id="paramP" min="0.01" max="0.99" step="0.05" value="0.50">
+          </div>
+          <div class="form-row">
+            <label for="weightParamP">p (веса):</label>
+            <input type="number" id="weightParamP" min="0.01" max="0.99" step="0.05" value="0.40">
+          </div>
+          <div class="form-row">
+            <input type="checkbox" id="directedCheck">
+            <label for="directedCheck">Ориентированный</label>
+          </div>
+          <div class="form-row">
+            <label>Веса:</label>
+            <div class="radio-group">
+              <label><input type="radio" name="weightType" value="positive" checked> Положительные</label>
+              <label><input type="radio" name="weightType" value="negative"> Отрицательные</label>
+              <label><input type="radio" name="weightType" value="mixed"> Смешанные</label>
+            </div>
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="generateBtn">Сгенерировать</button>
+          </div>
+
+          <div class="matrix-label">Матрица смежности (невзвешенная)</div>
+          <div id="adjMatrix"></div>
+
+          <div class="matrix-label">Матрица смежности (взвешенная)</div>
+          <div id="weightMatrix"></div>
+
+          <h3 class="section-heading">Анализ (Задание 2)</h3>
+          <div id="analysisText" class="text-output"></div>
+        </div>
+
+        <!-- ======== Tab 1: Метод Шимбелла ======== -->
+        <div class="tab-panel" id="panel-1">
+          <div class="form-row">
+            <label for="pathLength">Длина пути (k):</label>
+            <input type="number" id="pathLength" min="1" max="50" value="2">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="shimbelBtn">Рассчитать</button>
+          </div>
+
+          <div class="matrix-label">Матрица минимальных путей</div>
+          <div id="minMatrix"></div>
+
+          <div class="matrix-label">Матрица максимальных путей</div>
+          <div id="maxMatrix"></div>
+        </div>
+
+        <!-- ======== Tab 2: Поиск маршрута ======== -->
+        <div class="tab-panel" id="panel-2">
+          <div class="form-row">
+            <label for="fromVertex">Из вершины:</label>
+            <input type="number" id="fromVertex" min="0" max="0" value="0">
+          </div>
+          <div class="form-row">
+            <label for="toVertex">В вершину:</label>
+            <input type="number" id="toVertex" min="0" max="0" value="0">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="findRouteBtn">Найти маршрут</button>
+          </div>
+
+          <div id="routeText" class="text-output"></div>
+
+          <div class="matrix-label">Матрица смежности (маршрут выделен)</div>
+          <div id="routeMatrix"></div>
+        </div>
+
+        <!-- ======== Tab 3: Точки сочленения ======== -->
+        <div class="tab-panel" id="panel-3">
+          <div class="btn-row">
+            <button class="btn" id="bicompBtn">Найти точки сочленения</button>
+          </div>
+
+          <div id="bicompText" class="text-output"></div>
+
+          <div class="matrix-label">Матрица смежности (точки сочленения выделены)</div>
+          <div id="bicompMatrix"></div>
+        </div>
+
+        <!-- ======== Tab 4: Дейкстра (отр. веса) ======== -->
+        <div class="tab-panel" id="panel-4">
+          <div class="form-row">
+            <span class="info-label" id="dijkWeightTypeLabel">Тип весов: (сначала сгенерируйте граф)</span>
+          </div>
+          <div class="form-row">
+            <label for="dijkSrc">Из вершины:</label>
+            <input type="number" id="dijkSrc" min="0" max="0" value="0">
+          </div>
+          <div class="form-row">
+            <label for="dijkDst">В вершину:</label>
+            <input type="number" id="dijkDst" min="0" max="0" value="0">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="dijkBtn">Рассчитать Дейкстру</button>
+          </div>
+
+          <div id="dijkText" class="text-output"></div>
+
+          <div class="matrix-label">Весовая матрица (путь выделен)</div>
+          <div id="dijkMatrix"></div>
+        </div>
+
+        <!-- ======== Tab 5: Сравнение алгоритмов ======== -->
+        <div class="tab-panel" id="panel-5">
+          <div class="form-row">
+            <label for="cmpMinN">n от:</label>
+            <input type="number" id="cmpMinN" min="2" max="500" value="5">
+          </div>
+          <div class="form-row">
+            <label for="cmpMaxN">до:</label>
+            <input type="number" id="cmpMaxN" min="2" max="500" value="50">
+          </div>
+          <div class="form-row">
+            <label for="cmpStep">шаг:</label>
+            <input type="number" id="cmpStep" min="1" max="100" value="5">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="cmpBtn">Запустить сравнение</button>
+          </div>
+
+          <div id="cmpText" class="text-output"></div>
+          <div id="cmpTable"></div>
+        </div>
+
+      </div><!-- /tab-panels -->
+    </div><!-- /sidebar -->
+
+    <div id="graph-area">
+      <canvas id="graph-canvas"></canvas>
+    </div>
+  </div><!-- /app -->
+
+  <!-- Scripts in dependency order -->
+  <script src="js/distribution.js"></script>
+  <script src="js/generator.js"></script>
+  <script src="js/analysis.js"></script>
+  <script src="js/shimbel.js"></script>
+  <script src="js/routesearch.js"></script>
+  <script src="js/bicomp.js"></script>
+  <script src="js/dijkstraneg.js"></script>
+  <script src="js/graph-canvas.js"></script>
+  <script src="js/ui-helpers.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
