@@ -152,5 +152,35 @@ window.GraphGenerator = {
       adjMatrix: adjMatrix,
       weightMatrix: weightMatrix
     };
+  },
+
+  regenerateWeights(graphData, weightType, weightP) {
+    const n = graphData.n;
+    if (n <= 1) return;
+
+    const weightDist = new window.FarryDistribution(weightP);
+    const wm = [];
+    for (let i = 0; i < n; i++) {
+      wm.push(new Array(n).fill(0));
+    }
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (graphData.adjMatrix[i][j] !== 0) {
+          let w = weightDist.generate();
+          if (weightType === 'negative') {
+            w = -w;
+          } else if (weightType === 'mixed') {
+            if (Math.random() < 0.5) w = -w;
+          }
+          wm[i][j] = w;
+          if (!graphData.directed && graphData.adjMatrix[j][i] !== 0) {
+            wm[j][i] = w;
+          }
+        }
+      }
+    }
+
+    graphData.weightMatrix = wm;
   }
 };

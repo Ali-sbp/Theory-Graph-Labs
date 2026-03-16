@@ -44,6 +44,17 @@ window.Shimbel = (function () {
 
   function minPath(weightMatrix, k) {
     var n = weightMatrix.length;
+
+    // k=0: identity matrix (0 on diagonal, POS_INF elsewhere)
+    if (k === 0) {
+      var I = [];
+      for (var i = 0; i < n; i++) {
+        I.push(new Array(n).fill(POS_INF));
+        I[i][i] = 0;
+      }
+      return I;
+    }
+
     // Build initial matrix W: 0 entries become POS_INF, others kept
     var W = [];
     for (var i = 0; i < n; i++) {
@@ -63,6 +74,17 @@ window.Shimbel = (function () {
 
   function maxPath(weightMatrix, k) {
     var n = weightMatrix.length;
+
+    // k=0: identity matrix (0 on diagonal, NEG_INF elsewhere)
+    if (k === 0) {
+      var I = [];
+      for (var i = 0; i < n; i++) {
+        I.push(new Array(n).fill(NEG_INF));
+        I[i][i] = 0;
+      }
+      return I;
+    }
+
     // Build initial matrix W: 0 entries become NEG_INF, others kept
     var W = [];
     for (var i = 0; i < n; i++) {

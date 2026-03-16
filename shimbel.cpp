@@ -39,8 +39,15 @@ std::vector<std::vector<int>> Shimbel::minPath(
     const std::vector<std::vector<int>>& weightMatrix, int k)
 {
     const int n = static_cast<int>(weightMatrix.size());
-    if (n == 0 || k <= 0)
-        return std::vector<std::vector<int>>(n, std::vector<int>(n, POS_INF));
+    if (n == 0)
+        return {};
+
+    // k=0: identity matrix in min-plus semiring (0 on diagonal, POS_INF elsewhere)
+    if (k == 0) {
+        std::vector<std::vector<int>> I(n, std::vector<int>(n, POS_INF));
+        for (int i = 0; i < n; ++i) I[i][i] = 0;
+        return I;
+    }
 
     // Build initial weight matrix W (POS_INF = no edge)
     std::vector<std::vector<int>> W(n, std::vector<int>(n, POS_INF));
@@ -60,8 +67,15 @@ std::vector<std::vector<int>> Shimbel::maxPath(
     const std::vector<std::vector<int>>& weightMatrix, int k)
 {
     const int n = static_cast<int>(weightMatrix.size());
-    if (n == 0 || k <= 0)
-        return std::vector<std::vector<int>>(n, std::vector<int>(n, NEG_INF));
+    if (n == 0)
+        return {};
+
+    // k=0: identity matrix in max-plus semiring (0 on diagonal, NEG_INF elsewhere)
+    if (k == 0) {
+        std::vector<std::vector<int>> I(n, std::vector<int>(n, NEG_INF));
+        for (int i = 0; i < n; ++i) I[i][i] = 0;
+        return I;
+    }
 
     // Build initial weight matrix W (NEG_INF = no edge)
     std::vector<std::vector<int>> W(n, std::vector<int>(n, NEG_INF));

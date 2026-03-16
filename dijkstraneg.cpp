@@ -28,14 +28,18 @@ DijkstraNegResult DijkstraNeg::solve(
     std::priority_queue<PII, std::vector<PII>, std::greater<PII>> pq;
     pq.push({0, source});
 
+    // Record initial state (stage 0 = source vertex with dist[source]=0)
+    result.stages.push_back({source, result.dist});
+
     while (!pq.empty()) {
         auto [d, u] = pq.top();
         pq.pop();
-        ++result.iterations;
 
         // Skip stale entries
         if (d > result.dist[u])
             continue;
+
+        ++result.iterations;
 
         ++relaxCount[u];
         if (relaxCount[u] > n) {
@@ -60,6 +64,9 @@ DijkstraNegResult DijkstraNeg::solve(
                 pq.push({newDist, v});
             }
         }
+
+        // Record state after processing vertex u
+        result.stages.push_back({u, result.dist});
     }
 
     return result;

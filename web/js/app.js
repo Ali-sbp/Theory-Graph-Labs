@@ -68,6 +68,7 @@
     $('bicompText').textContent = '';
     $('bicompMatrix').innerHTML = '';
     $('dijkText').textContent = '';
+    $('dijkStagesTable').innerHTML = '';
     $('dijkMatrix').innerHTML = '';
     $('cmpText').textContent = '';
     $('cmpTable').innerHTML = '';
@@ -94,27 +95,19 @@
     }
 
     text += 'Эксцентриситеты:\n';
-    let unreachableCount = 0;
     for (let i = 0; i < n; i++) {
-      const ecc = res.eccentricities[i] === Infinity ? '∞' : res.eccentricities[i];
-      text += '  v' + i + ' = ' + ecc + '\n';
-      if (res.eccentricities[i] === Infinity) unreachableCount++;
-    }
-
-    if (unreachableCount > 0) {
-      text += '\n⚠ ' + unreachableCount + ' вершин(а) имеют эксц. = ∞ (не все вершины достижимы; граф ориентированный).\n';
+      text += '  v' + i + ' = ' + res.eccentricities[i] + '\n';
     }
 
     text += '\nЦентр графа: { ' + res.center.join(', ') + ' }\n';
 
-    const diam = res.diameter === Infinity ? '∞' : res.diameter;
-    text += 'Диаметр: ' + diam + '\n';
+    text += 'Диаметр: ' + res.diameter + '\n';
     text += 'Диаметральные вершины: { ' + res.diametralVertices.join(', ') + ' }';
 
     $('analysisText').textContent = text;
 
     // Update ranges on other tabs
-    setInputRange('pathLength', 1, Math.max(1, n - 1));
+    setInputRange('pathLength', 0, Math.max(1, n - 1));
     setInputRange('fromVertex', 0, n - 1);
     setInputRange('toVertex', 0, n - 1);
     setInputRange('dijkSrc', 0, n - 1);
@@ -254,16 +247,10 @@
 
     const res = DijkstraNeg.solve(graph.weightMatrix, src, graph.directed);
     let text = '';
-    text += 'Количество итераций (Дейкстра): ' + res.iterations + '\n\n';
+    text += 'Количество итераций (Дейкстра): ' + res.iterations + '\n';
 
     if (res.hasNegativeCycle) {
       text += '⚠ Обнаружен отрицательный цикл!\n';
-    }
-
-    text += 'Вектор расстояний от вершины ' + src + ':\n';
-    for (let i = 0; i < n; i++) {
-      const d = res.dist[i] >= INF ? '∞' : res.dist[i];
-      text += '  d[' + i + '] = ' + d + '\n';
     }
 
     const path = DijkstraNeg.reconstructPath(res.parent, src, dst);
@@ -281,6 +268,28 @@
 
     $('dijkText').textContent = text;
 
+    // --- Dijkstra stages table ---
+    {
+      let html = '<table class="matrix-table"><thead><tr>';
+      html += '<th>Этап</th><th>Обр. верш.</th>';
+      for (let i = 0; i < n; i++) html += '<th>d[' + i + ']</th>';
+      html += '</tr></thead><tbody>';
+
+      for (let s = 0; s < res.stages.length; s++) {
+        html += '<tr>';
+        html += '<td>' + s + '</td>';
+        html += '<td class="cell-highlight-blue">v' + res.stages[s].vertex + '</td>';
+        for (let i = 0; i < n; i++) {
+          const dVal = res.stages[s].dist[i] >= INF ? '∞' : res.stages[s].dist[i];
+          const cls = (i === res.stages[s].vertex) ? ' class="cell-highlight-blue"' : '';
+          html += '<td' + cls + '>' + dVal + '</td>';
+        }
+        html += '</tr>';
+      }
+      html += '</tbody></table>';
+      $('dijkStagesTable').innerHTML = html;
+    }
+
     UIHelpers.displayMatrix('dijkMatrix', graph.weightMatrix, 0, 'weighted');
     if (path.length > 0) {
       const edges = [];
@@ -291,6 +300,31 @@
     } else {
       graphCanvas.clearHighlights();
     }
+  }
+
+  // ---- Regenerate weights ----
+  function onRegenerateWeights(weightType) {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+
+    const wp = clamp(floatVal('weightParamP', 0.4), 0.01, 0.99);
+    GraphGenerator.regenerateWeights(graph, weightType, wp);
+
+    // Update canvas and weight matrix display
+    graphCanvas.setGraph(graph);
+    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
+
+    // Clear stale results
+    $('minMatrix').innerHTML = '';
+    $('maxMatrix').innerHTML = '';
+    $('dijkText').textContent = '';
+    $('dijkStagesTable').innerHTML = '';
+    $('dijkMatrix').innerHTML = '';
+    $('cmpText').textContent = '';
+    $('cmpTable').innerHTML = '';
+
+    // Update weight type label
+    const labels = { positive: 'Положительные', negative: 'Отрицательные', mixed: 'Смешанные' };
+    $('dijkWeightTypeLabel').textContent = 'Тип весов: ' + (labels[weightType] || weightType);
   }
 
   // ---- Tab 5: Comparison ----
@@ -341,6 +375,9 @@
     $('bicompBtn').addEventListener('click', onFindBiComp);
     $('dijkBtn').addEventListener('click', onDijkstraCalculate);
     $('cmpBtn').addEventListener('click', onRunComparison);
+    $('regenPosBtn').addEventListener('click', function () { onRegenerateWeights('positive'); });
+    $('regenNegBtn').addEventListener('click', function () { onRegenerateWeights('negative'); });
+    $('regenMixBtn').addEventListener('click', function () { onRegenerateWeights('mixed'); });
   });
 
 })();

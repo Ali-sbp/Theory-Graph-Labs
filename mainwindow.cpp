@@ -123,6 +123,25 @@ void MainWindow::setupTab1(QWidget* tab)
     row2->addWidget(generateBtn);
     layout->addLayout(row2);
 
+    // --- Row 3: Regenerate weights buttons ---
+    auto* row3 = new QHBoxLayout;
+    row3->addWidget(new QLabel("Перегенерировать веса:"));
+
+    auto* regenPosBtn = new QPushButton("Положительные");
+    connect(regenPosBtn, &QPushButton::clicked, this, &MainWindow::onRegenWeightsPositive);
+    row3->addWidget(regenPosBtn);
+
+    auto* regenNegBtn = new QPushButton("Отрицательные");
+    connect(regenNegBtn, &QPushButton::clicked, this, &MainWindow::onRegenWeightsNegative);
+    row3->addWidget(regenNegBtn);
+
+    auto* regenMixBtn = new QPushButton("Смешанные");
+    connect(regenMixBtn, &QPushButton::clicked, this, &MainWindow::onRegenWeightsMixed);
+    row3->addWidget(regenMixBtn);
+
+    row3->addStretch();
+    layout->addLayout(row3);
+
     // --- Matrices side-by-side ---
     auto* splitter = new QSplitter(Qt::Horizontal);
 
@@ -137,7 +156,7 @@ void MainWindow::setupTab1(QWidget* tab)
     auto* wGroup = new QWidget;
     auto* wLay   = new QVBoxLayout(wGroup);
     wLay->setContentsMargins(0, 0, 0, 0);
-    wLay->addWidget(new QLabel("Матрица смежности (взвешенная)"));
+    wLay->addWidget(new QLabel("Матрица весов"));
     weightTable_ = new QTableWidget;
     wLay->addWidget(weightTable_);
     splitter->addWidget(wGroup);
@@ -164,7 +183,7 @@ void MainWindow::setupTab2(QWidget* tab)
     auto* row = new QHBoxLayout;
     row->addWidget(new QLabel("Длина пути (k):"));
     pathLength_ = new QSpinBox;
-    pathLength_->setRange(1, 50);
+    pathLength_->setRange(0, 50);
     pathLength_->setValue(2);
     row->addWidget(pathLength_);
 
@@ -266,6 +285,9 @@ void MainWindow::onGenerate()
     bicompTable_->setRowCount(0);
     bicompTable_->setColumnCount(0);
     dijkText_->clear();
+    dijkStagesTable_->clear();
+    dijkStagesTable_->setRowCount(0);
+    dijkStagesTable_->setColumnCount(0);
     dijkWeightTable_->clear();
     dijkWeightTable_->setRowCount(0);
     dijkWeightTable_->setColumnCount(0);
@@ -295,19 +317,8 @@ void MainWindow::onGenerate()
     }
 
     text += "Эксцентриситеты:\n";
-    int unreachableCount = 0;
     for (int i = 0; i < n; ++i) {
-        QString ecc = (res.eccentricities[i] == INT_MAX)
-                          ? QString::fromUtf8("∞")
-                          : QString::number(res.eccentricities[i]);
-        text += QString("  v%1 = %2\n").arg(i).arg(ecc);
-        if (res.eccentricities[i] == INT_MAX) ++unreachableCount;
-    }
-
-    if (unreachableCount > 0) {
-        text += QString("\n⚠ %1 вершин(а) имеют эксц. = ∞ "
-                        "(не все вершины достижимы; граф ориентированный).\n")
-                    .arg(unreachableCount);
+        text += QString("  v%1 = %2\n").arg(i).arg(res.eccentricities[i]);
     }
 
     text += "\nЦентр графа: { ";
@@ -317,10 +328,7 @@ void MainWindow::onGenerate()
     }
     text += " }\n";
 
-    QString diam = (res.diameter == INT_MAX)
-                       ? QString::fromUtf8("∞")
-                       : QString::number(res.diameter);
-    text += QString("Диаметр: %1\n").arg(diam);
+    text += QString("Диаметр: %1\n").arg(res.diameter);
 
     text += "Диаметральные вершины: { ";
     for (size_t i = 0; i < res.diametralVertices.size(); ++i) {
@@ -332,7 +340,7 @@ void MainWindow::onGenerate()
     analysisText_->setText(text);
 
     // Update spin-boxes on Tab 2, Tab 3, and Tab 5
-    pathLength_->setRange(1, std::max(1, n - 1));
+    pathLength_->setRange(0, std::max(1, n - 1));
     fromVertex_->setRange(0, n - 1);
     toVertex_->setRange(0, n - 1);
     dijkSrcVertex_->setRange(0, n - 1);
@@ -566,12 +574,28 @@ void MainWindow::setupTab5(QWidget* tab)
 
     dijkText_ = new QTextEdit;
     dijkText_->setReadOnly(true);
-    dijkText_->setMaximumHeight(180);
+    dijkText_->setMaximumHeight(120);
     layout->addWidget(dijkText_);
 
-    layout->addWidget(new QLabel("Весовая матрица (путь выделен)"));
+    auto* splitter = new QSplitter(Qt::Vertical);
+
+    auto* stagesGroup = new QWidget;
+    auto* stagesLay = new QVBoxLayout(stagesGroup);
+    stagesLay->setContentsMargins(0, 0, 0, 0);
+    stagesLay->addWidget(new QLabel("Таблица Дейкстры (по этапам)"));
+    dijkStagesTable_ = new QTableWidget;
+    stagesLay->addWidget(dijkStagesTable_);
+    splitter->addWidget(stagesGroup);
+
+    auto* weightGroup = new QWidget;
+    auto* weightLay = new QVBoxLayout(weightGroup);
+    weightLay->setContentsMargins(0, 0, 0, 0);
+    weightLay->addWidget(new QLabel("Весовая матрица (путь выделен)"));
     dijkWeightTable_ = new QTableWidget;
-    layout->addWidget(dijkWeightTable_, 1);
+    weightLay->addWidget(dijkWeightTable_);
+    splitter->addWidget(weightGroup);
+
+    layout->addWidget(splitter, 1);
 }
 
 // -----------------------------------------------------------------------
@@ -714,19 +738,10 @@ void MainWindow::onDijkstraCalculate()
     auto res = DijkstraNeg::solve(graph_.weightMatrix, src, graph_.directed);
 
     QString text;
-    text += QString("Количество итераций (Дейкстра): %1\n\n").arg(res.iterations);
+    text += QString("Количество итераций (Дейкстра): %1\n").arg(res.iterations);
 
     if (res.hasNegativeCycle) {
         text += "⚠ Обнаружен отрицательный цикл!\n";
-    }
-
-    // Distance vector
-    text += "Вектор расстояний от вершины " + QString::number(src) + ":\n";
-    for (int i = 0; i < n; ++i) {
-        QString d = (res.dist[i] >= INT_MAX / 2)
-                        ? QString::fromUtf8("∞")
-                        : QString::number(res.dist[i]);
-        text += QString("  d[%1] = %2\n").arg(i).arg(d);
     }
 
     // Shortest path
@@ -749,6 +764,49 @@ void MainWindow::onDijkstraCalculate()
     }
 
     dijkText_->setText(text);
+
+    // --- Display Dijkstra stages table ---
+    {
+        const int numStages = static_cast<int>(res.stages.size());
+        dijkStagesTable_->clear();
+        dijkStagesTable_->setRowCount(numStages);
+        dijkStagesTable_->setColumnCount(n + 1);  // +1 for processed vertex column
+
+        QStringList headers;
+        headers << "Обр. верш.";
+        for (int i = 0; i < n; ++i)
+            headers << QString("d[%1]").arg(i);
+        dijkStagesTable_->setHorizontalHeaderLabels(headers);
+
+        QStringList rowHeaders;
+        for (int s = 0; s < numStages; ++s)
+            rowHeaders << QString("Этап %1").arg(s);
+        dijkStagesTable_->setVerticalHeaderLabels(rowHeaders);
+
+        for (int s = 0; s < numStages; ++s) {
+            // Processed vertex column
+            auto* vItem = new QTableWidgetItem(QString("v%1").arg(res.stages[s].processedVertex));
+            vItem->setTextAlignment(Qt::AlignCenter);
+            vItem->setFlags(vItem->flags() & ~Qt::ItemIsEditable);
+            vItem->setBackground(QColor(200, 220, 255));
+            dijkStagesTable_->setItem(s, 0, vItem);
+
+            // Distance values
+            for (int i = 0; i < n; ++i) {
+                QString dStr = (res.stages[s].dist[i] >= INT_MAX / 2)
+                                   ? QString::fromUtf8("∞")
+                                   : QString::number(res.stages[s].dist[i]);
+                auto* item = new QTableWidgetItem(dStr);
+                item->setTextAlignment(Qt::AlignCenter);
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+                // Highlight the processed vertex column
+                if (i == res.stages[s].processedVertex)
+                    item->setBackground(QColor(200, 220, 255));
+                dijkStagesTable_->setItem(s, i + 1, item);
+            }
+        }
+        dijkStagesTable_->resizeColumnsToContents();
+    }
 
     // Display weight matrix with path highlighted
     displayMatrix(dijkWeightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
@@ -826,6 +884,46 @@ void MainWindow::onRunComparison()
                     .arg(rows.back().dijkstraIter);
     }
     cmpText_->setText(text);
+}
+
+// -----------------------------------------------------------------------
+//  Slots: Regenerate weights
+// -----------------------------------------------------------------------
+void MainWindow::onRegenWeightsPositive() { doRegenerateWeights(WeightType::Positive); }
+void MainWindow::onRegenWeightsNegative() { doRegenerateWeights(WeightType::Negative); }
+void MainWindow::onRegenWeightsMixed()    { doRegenerateWeights(WeightType::Mixed); }
+
+void MainWindow::doRegenerateWeights(WeightType wType)
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    const double wp = weightParamP_->value();
+    GraphGenerator::regenerateWeights(graph_, wType, wp);
+
+    // Update graph visualization
+    graphWidget_->setGraph(graph_);
+
+    // Refresh weight matrix display
+    displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
+
+    // Clear stale results on other tabs
+    minTable_->clear();  minTable_->setRowCount(0);  minTable_->setColumnCount(0);
+    maxTable_->clear();  maxTable_->setRowCount(0);  maxTable_->setColumnCount(0);
+    dijkText_->clear();
+    dijkStagesTable_->clear();  dijkStagesTable_->setRowCount(0);  dijkStagesTable_->setColumnCount(0);
+    dijkWeightTable_->clear();  dijkWeightTable_->setRowCount(0);  dijkWeightTable_->setColumnCount(0);
+    cmpText_->clear();
+
+    // Update weight type label on Dijkstra tab
+    if (wType == WeightType::Positive)
+        dijkWeightTypeLabel_->setText("Тип весов: Положительные");
+    else if (wType == WeightType::Negative)
+        dijkWeightTypeLabel_->setText("Тип весов: Отрицательные");
+    else
+        dijkWeightTypeLabel_->setText("Тип весов: Смешанные");
 }
 
 // -----------------------------------------------------------------------

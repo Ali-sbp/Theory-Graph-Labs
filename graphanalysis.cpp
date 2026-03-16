@@ -32,32 +32,26 @@ AnalysisResult GraphAnalysis::analyze(const std::vector<std::vector<int>>& adj,
             }
         }
 
+        // Eccentricity = max distance to reachable vertices (hops, not weights)
         int ecc = 0;
-        bool reachAll = true;
         for (int v = 0; v < n; ++v) {
             if (v == src) continue;
-            if (dist[v] == INF) {
-                reachAll = false;
-                break;
-            }
-            ecc = std::max(ecc, dist[v]);
+            if (dist[v] != INF)
+                ecc = std::max(ecc, dist[v]);
         }
-        result.eccentricities[src] = reachAll ? ecc : INF;
+        result.eccentricities[src] = ecc;
     }
 
     // Diameter = max eccentricity,  Center = min eccentricity
-    int minEcc = INF;
+    int minEcc = INT_MAX;
     int maxEcc = 0;
 
     for (int i = 0; i < n; ++i) {
         minEcc = std::min(minEcc, result.eccentricities[i]);
-        if (result.eccentricities[i] != INF)
-            maxEcc = std::max(maxEcc, result.eccentricities[i]);
+        maxEcc = std::max(maxEcc, result.eccentricities[i]);
     }
 
-    // If every vertex has infinite eccentricity, diameter = INF
-    bool allInfinite = (minEcc == INF);
-    result.diameter = allInfinite ? INF : maxEcc;
+    result.diameter = maxEcc;
 
     for (int i = 0; i < n; ++i) {
         if (result.eccentricities[i] == minEcc)

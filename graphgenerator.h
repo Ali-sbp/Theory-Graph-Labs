@@ -18,4 +18,7 @@ public:
     // Degree distribution and weights follow the Farry (geometric) distribution.
     static GraphData generate(int n, double degreeP, bool directed,
                               WeightType wType, double weightP);
+
+    // Regenerate only the weights for an existing graph (keeps adjMatrix intact).
+    static void regenerateWeights(GraphData& data, WeightType wType, double weightP);
 };

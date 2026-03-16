@@ -31,6 +31,9 @@ private slots:
     void onDijkstraCalculate();
     void onRunComparison();
     void onTabChanged(int index);
+    void onRegenWeightsPositive();
+    void onRegenWeightsNegative();
+    void onRegenWeightsMixed();
 
 private:
     void setupTab1(QWidget* tab);
@@ -54,6 +57,7 @@ private:
                        const std::vector<std::pair<int,int>>& edges);
     void highlightCells(QTableWidget* table,
                         const std::vector<int>& vertices, const QColor& color);
+    void doRegenerateWeights(WeightType wType);
 
     // ---- Tab 1 widgets ----
     QSpinBox*        vertexCount_;
@@ -87,6 +91,7 @@ private:
     QSpinBox*        dijkDstVertex_;
     QLabel*          dijkWeightTypeLabel_;
     QTextEdit*       dijkText_;
+    QTableWidget*    dijkStagesTable_;
     QTableWidget*    dijkWeightTable_;
 
     // ---- Tab 6 widgets (Comparison) ----

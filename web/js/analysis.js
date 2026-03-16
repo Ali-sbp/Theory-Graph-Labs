@@ -24,36 +24,25 @@ window.GraphAnalysis = {
         }
       }
 
+      // Eccentricity = max distance to reachable vertices (hops, not weights)
       let maxDist = 0;
-      let allReachable = true;
       for (let v = 0; v < n; v++) {
-        if (v !== src) {
-          if (dist[v] === -1) {
-            allReachable = false;
-            break;
-          }
+        if (v !== src && dist[v] !== -1) {
           if (dist[v] > maxDist) {
             maxDist = dist[v];
           }
         }
       }
 
-      eccentricities[src] = allReachable ? maxDist : Infinity;
+      eccentricities[src] = maxDist;
     }
 
-    // Diameter: max finite eccentricity, or Infinity if all are infinite
+    // Diameter: max eccentricity
     let diameter = 0;
-    let hasFinite = false;
     for (let i = 0; i < n; i++) {
-      if (eccentricities[i] !== Infinity) {
-        hasFinite = true;
-        if (eccentricities[i] > diameter) {
-          diameter = eccentricities[i];
-        }
+      if (eccentricities[i] > diameter) {
+        diameter = eccentricities[i];
       }
-    }
-    if (!hasFinite) {
-      diameter = Infinity;
     }
 
     // Center: vertices with minimum eccentricity
@@ -72,11 +61,9 @@ window.GraphAnalysis = {
 
     // Diametral vertices: vertices whose eccentricity equals the diameter
     const diametralVertices = [];
-    if (diameter !== Infinity) {
-      for (let i = 0; i < n; i++) {
-        if (eccentricities[i] === diameter) {
-          diametralVertices.push(i);
-        }
+    for (let i = 0; i < n; i++) {
+      if (eccentricities[i] === diameter) {
+        diametralVertices.push(i);
       }
     }
 

@@ -264,6 +264,22 @@ body {
   color: #FFD4A0 !important;
 }
 
+.cell-highlight-blue {
+  background: #2e3e6b !important;
+  color: #C8DCFF !important;
+}
+
+.btn-sm {
+  padding: 5px 12px;
+  font-size: 0.8rem;
+}
+
+.form-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #bbb;
+}
+
 /* ===== Text Output ===== */
 .text-output {
   font-family: "SF Mono", "Fira Code", "Consolas", monospace;

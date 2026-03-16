@@ -2,11 +2,17 @@
 
 #include <vector>
 
+struct DijkstraStage {
+    int processedVertex;        // vertex processed at this stage
+    std::vector<int> dist;      // snapshot of distance vector after relaxation
+};
+
 struct DijkstraNegResult {
     std::vector<int> dist;          // distance vector from source
     std::vector<int> parent;        // predecessor array for path reconstruction
     bool hasNegativeCycle = false;
     int iterations = 0;
+    std::vector<DijkstraStage> stages;  // full table of all stages
 };
 
 class DijkstraNeg {

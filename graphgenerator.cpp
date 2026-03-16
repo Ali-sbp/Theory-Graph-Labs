@@ -141,3 +141,39 @@ GraphData GraphGenerator::generate(int n, double degreeP, bool directed,
 
     return data;
 }
+
+void GraphGenerator::regenerateWeights(GraphData& data, WeightType wType, double weightP)
+{
+    const int n = data.n;
+    if (n <= 1) return;
+
+    std::mt19937 rng(static_cast<unsigned>(
+        std::chrono::high_resolution_clock::now().time_since_epoch().count()));
+
+    FarryDistribution weightDist(weightP);
+    std::uniform_int_distribution<int> signDist(0, 1);
+
+    data.weightMatrix.assign(n, std::vector<int>(n, 0));
+
+    for (int i = 0; i < n; ++i) {
+        int jStart = data.directed ? 0 : i + 1;
+        for (int j = jStart; j < n; ++j) {
+            if (data.adjMatrix[i][j]) {
+                int w = weightDist.generate();
+                switch (wType) {
+                case WeightType::Positive:
+                    break;
+                case WeightType::Negative:
+                    w = -w;
+                    break;
+                case WeightType::Mixed:
+                    if (signDist(rng)) w = -w;
+                    break;
+                }
+                data.weightMatrix[i][j] = w;
+                if (!data.directed)
+                    data.weightMatrix[j][i] = w;
+            }
+        }
+    }
+}

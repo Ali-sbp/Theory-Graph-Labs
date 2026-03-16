@@ -72,20 +72,25 @@ window.DijkstraNeg = (function () {
     var hasNegativeCycle = false;
 
     dist[source] = 0;
+    var stages = [];
 
     var pq = new MinHeap();
     pq.push([0, source]);
+
+    // Record initial state
+    stages.push({ vertex: source, dist: dist.slice() });
 
     while (pq.size() > 0) {
       var top = pq.pop();
       var d = top[0];
       var u = top[1];
-      iterations++;
 
       // Skip stale entries
       if (d > dist[u]) {
         continue;
       }
+
+      iterations++;
 
       relaxCount[u]++;
       if (relaxCount[u] > n) {
@@ -106,13 +111,17 @@ window.DijkstraNeg = (function () {
           pq.push([newDist, v]);
         }
       }
+
+      // Record state after processing vertex u
+      stages.push({ vertex: u, dist: dist.slice() });
     }
 
     return {
       dist: dist,
       parent: parent,
       hasNegativeCycle: hasNegativeCycle,
-      iterations: iterations
+      iterations: iterations,
+      stages: stages
     };
   }
 

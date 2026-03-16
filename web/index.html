@@ -51,11 +51,17 @@
           <div class="btn-row">
             <button class="btn" id="generateBtn">Сгенерировать</button>
           </div>
+          <div class="btn-row">
+            <span class="form-label">Перегенерировать веса:</span>
+            <button class="btn btn-sm" id="regenPosBtn">Положительные</button>
+            <button class="btn btn-sm" id="regenNegBtn">Отрицательные</button>
+            <button class="btn btn-sm" id="regenMixBtn">Смешанные</button>
+          </div>
 
           <div class="matrix-label">Матрица смежности (невзвешенная)</div>
           <div id="adjMatrix"></div>
 
-          <div class="matrix-label">Матрица смежности (взвешенная)</div>
+          <div class="matrix-label">Матрица весов</div>
           <div id="weightMatrix"></div>
 
           <h3 class="section-heading">Анализ (Задание 2)</h3>
@@ -66,7 +72,7 @@
         <div class="tab-panel" id="panel-1">
           <div class="form-row">
             <label for="pathLength">Длина пути (k):</label>
-            <input type="number" id="pathLength" min="1" max="50" value="2">
+            <input type="number" id="pathLength" min="0" max="50" value="2">
           </div>
           <div class="btn-row">
             <button class="btn" id="shimbelBtn">Рассчитать</button>
@@ -129,6 +135,9 @@
           </div>
 
           <div id="dijkText" class="text-output"></div>
+
+          <div class="matrix-label">Таблица Дейкстры (по этапам)</div>
+          <div id="dijkStagesTable"></div>
 
           <div class="matrix-label">Весовая матрица (путь выделен)</div>
           <div id="dijkMatrix"></div>
