@@ -12,8 +12,8 @@
   // ---- Helpers ----
   function $(id) { return document.getElementById(id); }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
-  function intVal(id, fallback) { return parseInt($(id).value, 10) || fallback; }
-  function floatVal(id, fallback) { return parseFloat($(id).value) || fallback; }
+  function intVal(id, fallback) { var v = parseInt($(id).value, 10); return isNaN(v) ? fallback : v; }
+  function floatVal(id, fallback) { var v = parseFloat($(id).value); return isNaN(v) ? fallback : v; }
 
   function setInputRange(id, min, max) {
     const el = $(id);
