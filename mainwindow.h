@@ -40,11 +40,16 @@ private:
     void setupTab5(QWidget* tab);
     void setupTab6(QWidget* tab);
 
+    enum class MatrixMode { Default, Adjacency, Weighted };
+
     // sentinel: values >= sentinel (if sentinel>0) shown as "∞",
     //           values <= sentinel (if sentinel<0) shown as "-∞"
+    // mode: Adjacency → off-diagonal zeros shown as "-"
+    //        Weighted  → off-diagonal zeros shown as "∞"
     void displayMatrix(QTableWidget* table,
                        const std::vector<std::vector<int>>& matrix,
-                       int sentinel = 0);
+                       int sentinel = 0,
+                       MatrixMode mode = MatrixMode::Default);
     void highlightPath(QTableWidget* table,
                        const std::vector<std::pair<int,int>>& edges);
     void highlightCells(QTableWidget* table,

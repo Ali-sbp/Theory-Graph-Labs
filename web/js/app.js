@@ -73,8 +73,8 @@
     $('cmpTable').innerHTML = '';
 
     // Display matrices
-    UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix);
-    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix);
+    UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
+    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
 
     // ---- Analysis ----
     const res = GraphAnalysis.analyze(graph.adjMatrix, dir);
@@ -158,7 +158,7 @@
     if (from === to) {
       $('routeText').textContent =
         'Вершина ' + from + ' = вершина ' + to + ' — тривиальный маршрут (длина 0, 1 путь).';
-      UIHelpers.displayMatrix('routeMatrix', graph.adjMatrix);
+      UIHelpers.displayMatrix('routeMatrix', graph.adjMatrix, 0, 'adjacency');
       graphCanvas.highlightRoute([from]);
       return;
     }
@@ -176,7 +176,7 @@
     }
     $('routeText').textContent = text;
 
-    UIHelpers.displayMatrix('routeMatrix', graph.adjMatrix);
+    UIHelpers.displayMatrix('routeMatrix', graph.adjMatrix, 0, 'adjacency');
     if (res.exists) {
       const edges = [];
       for (let i = 0; i + 1 < res.path.length; i++)
@@ -195,7 +195,7 @@
     const n = graph.n;
     if (n <= 1) {
       $('bicompText').textContent = 'Граф содержит ≤ 1 вершины — точек сочленения нет.';
-      UIHelpers.displayMatrix('bicompMatrix', graph.adjMatrix);
+      UIHelpers.displayMatrix('bicompMatrix', graph.adjMatrix, 0, 'adjacency');
       graphCanvas.clearHighlights();
       return;
     }
@@ -232,7 +232,7 @@
 
     $('bicompText').textContent = text;
 
-    UIHelpers.displayMatrix('bicompMatrix', adj);
+    UIHelpers.displayMatrix('bicompMatrix', adj, 0, 'adjacency');
     UIHelpers.highlightCells('bicompMatrix', Array.from(res.articulationPoints), 'cell-highlight-red');
 
     graphCanvas.highlightBiComp(res.articulationPoints, res.blocks);
@@ -281,7 +281,7 @@
 
     $('dijkText').textContent = text;
 
-    UIHelpers.displayMatrix('dijkMatrix', graph.weightMatrix);
+    UIHelpers.displayMatrix('dijkMatrix', graph.weightMatrix, 0, 'weighted');
     if (path.length > 0) {
       const edges = [];
       for (let i = 0; i + 1 < path.length; i++)

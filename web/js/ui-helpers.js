@@ -12,7 +12,7 @@
      * @param {number} sentinel — if > 0, values >= sentinel render as "∞";
      *                             if < 0, values <= sentinel render as "∞"
      */
-    displayMatrix(containerId, matrix, sentinel) {
+    displayMatrix(containerId, matrix, sentinel, mode) {
       if (sentinel === undefined) sentinel = 0;
       const container = document.getElementById(containerId);
       if (!container) return;
@@ -61,6 +61,10 @@
             display = '\u221E';
           } else if (sentinel < 0 && val <= sentinel) {
             display = '\u221E';
+          } else if (i !== j && val === 0 && mode === 'weighted') {
+            display = '\u221E';
+          } else if (i !== j && val === 0 && mode === 'adjacency') {
+            display = '-';
           } else {
             display = String(val);
           }

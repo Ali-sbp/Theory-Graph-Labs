@@ -272,8 +272,8 @@ void MainWindow::onGenerate()
     cmpText_->clear();
 
     // Display matrices
-    displayMatrix(adjTable_,    graph_.adjMatrix);
-    displayMatrix(weightTable_, graph_.weightMatrix);
+    displayMatrix(adjTable_,    graph_.adjMatrix, 0, MatrixMode::Adjacency);
+    displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
 
     // --- Task 2: Analysis ---
     auto res = GraphAnalysis::analyze(graph_.adjMatrix, dir);
@@ -402,7 +402,7 @@ void MainWindow::onFindRoute()
         routeText_->setText(
             QString("Вершина %1 = вершина %2 — тривиальный маршрут (длина 0, 1 путь).")
                 .arg(from).arg(to));
-        displayMatrix(routeTable_, graph_.adjMatrix);
+        displayMatrix(routeTable_, graph_.adjMatrix, 0, MatrixMode::Adjacency);
         graphWidget_->highlightRoute({from});
         return;
     }
@@ -426,7 +426,7 @@ void MainWindow::onFindRoute()
     routeText_->setText(text);
 
     // Display adjacency matrix with highlighted path edges
-    displayMatrix(routeTable_, graph_.adjMatrix);
+    displayMatrix(routeTable_, graph_.adjMatrix, 0, MatrixMode::Adjacency);
     if (res.exists) {
         std::vector<std::pair<int,int>> edges;
         for (size_t i = 0; i + 1 < res.path.size(); ++i)
@@ -443,7 +443,8 @@ void MainWindow::onFindRoute()
 // -----------------------------------------------------------------------
 void MainWindow::displayMatrix(QTableWidget* table,
                                const std::vector<std::vector<int>>& matrix,
-                               int sentinel)
+                               int sentinel,
+                               MatrixMode mode)
 {
     const int n = static_cast<int>(matrix.size());
     table->clear();
@@ -463,6 +464,10 @@ void MainWindow::displayMatrix(QTableWidget* table,
                 text = QString::fromUtf8("∞");
             else if (sentinel < 0 && matrix[i][j] <= sentinel)
                 text = QString::fromUtf8("∞");
+            else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Weighted)
+                text = QString::fromUtf8("∞");
+            else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Adjacency)
+                text = QStringLiteral("-");
             else
                 text = QString::number(matrix[i][j]);
 
@@ -625,7 +630,7 @@ void MainWindow::onFindBiComp()
     const int n = graph_.n;
     if (n <= 1) {
         bicompText_->setText("Граф содержит ≤ 1 вершины — точек сочленения нет.");
-        displayMatrix(bicompTable_, graph_.adjMatrix);
+        displayMatrix(bicompTable_, graph_.adjMatrix, 0, MatrixMode::Adjacency);
         graphWidget_->clearHighlights();
         return;
     }
@@ -677,7 +682,7 @@ void MainWindow::onFindBiComp()
     bicompText_->setText(text);
 
     // Display matrix with highlighted articulation points
-    displayMatrix(bicompTable_, adj);
+    displayMatrix(bicompTable_, adj, 0, MatrixMode::Adjacency);
     std::vector<int> artVec(res.articulationPoints.begin(),
                             res.articulationPoints.end());
     highlightCells(bicompTable_, artVec, QColor(255, 200, 200));
@@ -746,7 +751,7 @@ void MainWindow::onDijkstraCalculate()
     dijkText_->setText(text);
 
     // Display weight matrix with path highlighted
-    displayMatrix(dijkWeightTable_, graph_.weightMatrix);
+    displayMatrix(dijkWeightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
     if (!path.empty()) {
         std::vector<std::pair<int,int>> edges;
         for (size_t i = 0; i + 1 < path.size(); ++i)
