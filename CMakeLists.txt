@@ -22,6 +22,9 @@ set(SOURCES
     bicomp.cpp
     dijkstraneg.cpp
     graphwidget.cpp
+    bellmanford.cpp
+    maxflow.cpp
+    mincostflow.cpp
 )
 
 set(HEADERS
@@ -34,6 +37,9 @@ set(HEADERS
     bicomp.h
     dijkstraneg.h
     graphwidget.h
+    bellmanford.h
+    maxflow.h
+    mincostflow.h
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})

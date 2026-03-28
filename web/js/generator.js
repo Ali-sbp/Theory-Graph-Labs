@@ -154,6 +154,138 @@ window.GraphGenerator = {
     };
   },
 
+  // BFS reachability: returns true if target is reachable from source
+  _canReach(adj, source, target) {
+    const n = adj.length;
+    if (source === target) return true;
+    const visited = new Array(n).fill(false);
+    const queue = [source];
+    visited[source] = true;
+    while (queue.length > 0) {
+      const u = queue.shift();
+      for (let v = 0; v < n; v++) {
+        if (adj[u][v] && !visited[v]) {
+          if (v === target) return true;
+          visited[v] = true;
+          queue.push(v);
+        }
+      }
+    }
+    return false;
+  },
+
+  // BFS reachability treating all edges as undirected
+  _canReachUndirected(adj, source, target) {
+    const n = adj.length;
+    if (source === target) return true;
+    const visited = new Array(n).fill(false);
+    const queue = [source];
+    visited[source] = true;
+    while (queue.length > 0) {
+      const u = queue.shift();
+      for (let v = 0; v < n; v++) {
+        if ((adj[u][v] || adj[v][u]) && !visited[v]) {
+          if (v === target) return true;
+          visited[v] = true;
+          queue.push(v);
+        }
+      }
+    }
+    return false;
+  },
+
+  generateDAG(n, degreeP, directed, weightType, weightP) {
+    if (n < 2) {
+      return {
+        n: n,
+        directed: directed,
+        adjMatrix: n === 1 ? [[0]] : [],
+        weightMatrix: n === 1 ? [[0]] : []
+      };
+    }
+
+    const degreeDist = new window.FarryDistribution(degreeP);
+
+    // 1. Generate target out-degrees
+    const targetOutDeg = new Array(n);
+    for (let i = 0; i < n; i++) {
+      targetOutDeg[i] = Math.max(1, Math.min(n - 1, degreeDist.generate()));
+    }
+
+    // 2. Build spanning chain for weak connectivity
+    const order = Array.from({ length: n }, (_, i) => i);
+    for (let i = order.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [order[i], order[j]] = [order[j], order[i]];
+    }
+
+    const adjMatrix = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    for (let i = 0; i + 1 < n; i++) {
+      adjMatrix[order[i]][order[i + 1]] = 1;
+      targetOutDeg[order[i]] = Math.max(0, targetOutDeg[order[i]] - 1);
+    }
+
+    // 3. Add extra edges with cycle checking
+    for (let i = 0; i < n; i++) {
+      const u = order[i];
+      if (targetOutDeg[u] <= 0) continue;
+
+      const candidates = [];
+      for (let v = 0; v < n; v++) {
+        if (v !== u && !adjMatrix[u][v]) candidates.push(v);
+      }
+      // Fisher-Yates shuffle
+      for (let k = candidates.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [candidates[k], candidates[j]] = [candidates[j], candidates[k]];
+      }
+
+      let added = 0;
+      for (const v of candidates) {
+        if (added >= targetOutDeg[u]) break;
+        // Acyclicity check:
+        //   directed:   safe iff v cannot reach u (directed)
+        //   undirected: safe iff u,v not yet connected (undirected)
+        const safe = directed ? !this._canReach(adjMatrix, v, u)
+                              : !this._canReachUndirected(adjMatrix, u, v);
+        if (safe) {
+          adjMatrix[u][v] = 1;
+          added++;
+        }
+      }
+    }
+
+    // 4. For undirected mode: symmetrize
+    if (!directed) {
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++) {
+          if (adjMatrix[i][j] || adjMatrix[j][i]) {
+            adjMatrix[i][j] = 1;
+            adjMatrix[j][i] = 1;
+          }
+        }
+    }
+
+    // 5. Generate weights
+    const weightDist = new window.FarryDistribution(weightP);
+    const weightMatrix = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (adjMatrix[i][j] !== 0) {
+          let w = weightDist.generate();
+          if (weightType === 'negative') w = -w;
+          else if (weightType === 'mixed' && Math.random() < 0.5) w = -w;
+          weightMatrix[i][j] = w;
+          if (!directed && adjMatrix[j][i] !== 0) weightMatrix[j][i] = w;
+        }
+      }
+    }
+
+    return { n, directed, adjMatrix, weightMatrix };
+  },
+
   regenerateWeights(graphData, weightType, weightP) {
     const n = graphData.n;
     if (n <= 1) return;

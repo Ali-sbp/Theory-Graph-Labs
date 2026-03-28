@@ -9,6 +9,16 @@
   let hasGraph = false;
   let graphCanvas = null;
 
+  // Original directed matrices (for directed/undirected rearrangement)
+  let originalAdjMatrix = null;
+  let originalWeightMatrix = null;
+
+  // Flow network state (Tab 6)
+  let capacityMatrix = null;
+  let costMatrix = null;
+  let hasFlowNetwork = false;
+  let lastMaxFlow = 0;
+
   // ---- Helpers ----
   function $(id) { return document.getElementById(id); }
   function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
@@ -38,7 +48,7 @@
         document.getElementById('panel-' + tab).classList.add('active');
 
         // Clear highlights on plain-graph tabs (matching onTabChanged)
-        if (tab === 0 || tab === 1 || tab === 5) {
+        if (tab === 0 || tab === 1 || tab === 5 || tab === 6) {
           if (graphCanvas) graphCanvas.clearHighlights();
         }
       });
@@ -57,6 +67,10 @@
     graph = GraphGenerator.generate(n, p, dir, wt, wp);
     hasGraph = true;
 
+    // Store original matrices for directed/undirected rearrangement
+    originalAdjMatrix = graph.adjMatrix.map(r => r.slice());
+    originalWeightMatrix = graph.weightMatrix.map(r => r.slice());
+
     // Update graph canvas
     graphCanvas.setGraph(graph);
 
@@ -72,6 +86,16 @@
     $('dijkMatrix').innerHTML = '';
     $('cmpText').textContent = '';
     $('cmpTable').innerHTML = '';
+
+    // Clear Tab 6 (Поток)
+    $('capacityMatrix').innerHTML = '';
+    $('costMatrixDisplay').innerHTML = '';
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+    hasFlowNetwork = false;
+    lastMaxFlow = 0;
 
     // Display matrices
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
@@ -114,7 +138,97 @@
     setInputRange('dijkDst', 0, Math.max(0, n - 1));
     if (n > 1) $('dijkDst').value = 1;
 
+    // Update Tab 6 spin boxes
+    setInputRange('flowSrc', 0, Math.max(0, n - 1));
+    setInputRange('flowSink', 0, Math.max(0, n - 1));
+    if (n > 1) $('flowSink').value = n - 1;
+
     // Update weight type label on Tab 4
+    const labels = { positive: 'Положительные', negative: 'Отрицательные', mixed: 'Смешанные' };
+    $('dijkWeightTypeLabel').textContent = 'Тип весов: ' + (labels[wt] || wt);
+  }
+
+  // ---- Tab 0: Generate DAG ----
+  function onGenerateDAG() {
+    const n = clamp(intVal('vertexCount', 6), 1, 100);
+    const p = clamp(floatVal('paramP', 0.5), 0.01, 0.99);
+    const wp = clamp(floatVal('weightParamP', 0.4), 0.01, 0.99);
+
+    const dir = $('directedCheck').checked;
+
+    const wtRadio = document.querySelector('input[name="weightType"]:checked');
+    const wt = wtRadio ? wtRadio.value : 'positive';
+
+    graph = GraphGenerator.generateDAG(n, p, dir, wt, wp);
+    hasGraph = true;
+
+    // Store original matrices for directed/undirected rearrangement
+    originalAdjMatrix = graph.adjMatrix.map(r => r.slice());
+    originalWeightMatrix = graph.weightMatrix.map(r => r.slice());
+
+    graphCanvas.setGraph(graph);
+
+    // Clear stale results (same as onGenerate)
+    $('minMatrix').innerHTML = '';
+    $('maxMatrix').innerHTML = '';
+    $('routeMatrix').innerHTML = '';
+    $('routeText').textContent = '';
+    $('bicompText').textContent = '';
+    $('bicompMatrix').innerHTML = '';
+    $('dijkText').textContent = '';
+    $('dijkStagesTable').innerHTML = '';
+    $('dijkMatrix').innerHTML = '';
+    $('cmpText').textContent = '';
+    $('cmpTable').innerHTML = '';
+
+    $('capacityMatrix').innerHTML = '';
+    $('costMatrixDisplay').innerHTML = '';
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+    hasFlowNetwork = false;
+    lastMaxFlow = 0;
+
+    UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
+    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
+
+    const res = GraphAnalysis.analyze(graph.adjMatrix, dir);
+    let text = '';
+
+    if (n === 1) {
+      text += 'Граф состоит из одной вершины (без рёбер).\n\n';
+      text += 'Эксцентриситет: v0 = 0\n';
+      text += 'Центр графа: { 0 }\n';
+      text += 'Диаметр: 0\n';
+      text += 'Диаметральные вершины: { 0 }';
+      $('analysisText').textContent = text;
+      setInputRange('fromVertex', 0, 0);
+      setInputRange('toVertex', 0, 0);
+      setInputRange('pathLength', 1, 1);
+      return;
+    }
+
+    text += 'Эксцентриситеты:\n';
+    for (let i = 0; i < n; i++) {
+      text += '  v' + i + ' = ' + res.eccentricities[i] + '\n';
+    }
+    text += '\nЦентр графа: { ' + res.center.join(', ') + ' }\n';
+    text += 'Диаметр: ' + res.diameter + '\n';
+    text += 'Диаметральные вершины: { ' + res.diametralVertices.join(', ') + ' }';
+    $('analysisText').textContent = text;
+
+    setInputRange('pathLength', 0, Math.max(1, n - 1));
+    setInputRange('fromVertex', 0, n - 1);
+    setInputRange('toVertex', 0, n - 1);
+    setInputRange('dijkSrc', 0, n - 1);
+    setInputRange('dijkDst', 0, Math.max(0, n - 1));
+    if (n > 1) $('dijkDst').value = 1;
+
+    setInputRange('flowSrc', 0, Math.max(0, n - 1));
+    setInputRange('flowSink', 0, Math.max(0, n - 1));
+    if (n > 1) $('flowSink').value = n - 1;
+
     const labels = { positive: 'Положительные', negative: 'Отрицательные', mixed: 'Смешанные' };
     $('dijkWeightTypeLabel').textContent = 'Тип весов: ' + (labels[wt] || wt);
   }
@@ -322,9 +436,125 @@
     $('cmpText').textContent = '';
     $('cmpTable').innerHTML = '';
 
+    // Clear Tab 6 (Поток)
+    $('capacityMatrix').innerHTML = '';
+    $('costMatrixDisplay').innerHTML = '';
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+    hasFlowNetwork = false;
+    lastMaxFlow = 0;
+
     // Update weight type label
     const labels = { positive: 'Положительные', negative: 'Отрицательные', mixed: 'Смешанные' };
     $('dijkWeightTypeLabel').textContent = 'Тип весов: ' + (labels[weightType] || weightType);
+  }
+
+  // ---- Rearrange directed / undirected ----
+  function onRearrangeDirected() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+
+    // Restore original directed matrices
+    graph.adjMatrix = originalAdjMatrix.map(r => r.slice());
+    graph.weightMatrix = originalWeightMatrix.map(r => r.slice());
+    graph.directed = true;
+    $('directedCheck').checked = true;
+
+    // Refresh display
+    graphCanvas.setGraph(graph);
+    UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
+    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
+
+    // Re-run analysis
+    const n = graph.n;
+    const res = GraphAnalysis.analyze(graph.adjMatrix, true);
+    let text = 'Эксцентриситеты:\n';
+    for (let i = 0; i < n; i++) text += '  v' + i + ' = ' + res.eccentricities[i] + '\n';
+    text += '\nЦентр графа: { ' + res.center.join(', ') + ' }\n';
+    text += 'Диаметр: ' + res.diameter + '\n';
+    text += 'Диаметральные вершины: { ' + res.diametralVertices.join(', ') + ' }';
+    $('analysisText').textContent = text;
+
+    // Clear downstream results
+    $('minMatrix').innerHTML = '';
+    $('maxMatrix').innerHTML = '';
+    $('dijkText').textContent = '';
+    $('dijkStagesTable').innerHTML = '';
+    $('dijkMatrix').innerHTML = '';
+    $('cmpText').textContent = '';
+    $('cmpTable').innerHTML = '';
+    $('capacityMatrix').innerHTML = '';
+    $('costMatrixDisplay').innerHTML = '';
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+    hasFlowNetwork = false;
+    lastMaxFlow = 0;
+  }
+
+  function onRearrangeUndirected() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+
+    const n = graph.n;
+
+    // Build undirected acyclic graph from original edges.
+    // Add each original edge as undirected only if it doesn't create a cycle.
+    const newAdj = Array.from({length: n}, () => new Array(n).fill(0));
+    const newWeight = Array.from({length: n}, () => new Array(n).fill(0));
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (i !== j && originalAdjMatrix[i][j] && !newAdj[i][j]) {
+          // Check if i and j are already connected undirectedly
+          if (!GraphGenerator._canReachUndirected(newAdj, i, j)) {
+            newAdj[i][j] = 1;
+            newAdj[j][i] = 1;
+            const w = originalWeightMatrix[i][j] !== 0 ? originalWeightMatrix[i][j]
+                                                       : originalWeightMatrix[j][i];
+            newWeight[i][j] = w;
+            newWeight[j][i] = w;
+          }
+        }
+      }
+    }
+
+    graph.adjMatrix = newAdj;
+    graph.weightMatrix = newWeight;
+    graph.directed = false;
+    $('directedCheck').checked = false;
+
+    // Refresh display
+    graphCanvas.setGraph(graph);
+    UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
+    UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
+
+    // Re-run analysis
+    const res = GraphAnalysis.analyze(graph.adjMatrix, false);
+    let text = 'Эксцентриситеты:\n';
+    for (let i = 0; i < n; i++) text += '  v' + i + ' = ' + res.eccentricities[i] + '\n';
+    text += '\nЦентр графа: { ' + res.center.join(', ') + ' }\n';
+    text += 'Диаметр: ' + res.diameter + '\n';
+    text += 'Диаметральные вершины: { ' + res.diametralVertices.join(', ') + ' }';
+    $('analysisText').textContent = text;
+
+    // Clear downstream results
+    $('minMatrix').innerHTML = '';
+    $('maxMatrix').innerHTML = '';
+    $('dijkText').textContent = '';
+    $('dijkStagesTable').innerHTML = '';
+    $('dijkMatrix').innerHTML = '';
+    $('cmpText').textContent = '';
+    $('cmpTable').innerHTML = '';
+    $('capacityMatrix').innerHTML = '';
+    $('costMatrixDisplay').innerHTML = '';
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+    hasFlowNetwork = false;
+    lastMaxFlow = 0;
   }
 
   // ---- Tab 5: Comparison ----
@@ -363,6 +593,124 @@
     $('cmpText').textContent = text;
   }
 
+  // ---- Tab 6: Flow Network ----
+
+  function onGenerateFlowNetwork() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    if (!graph.directed) {
+      alert('Для задачи о потоках граф должен быть ориентированным.\nПожалуйста, сгенерируйте ориентированный граф.');
+      return;
+    }
+
+    const src = intVal('flowSrc', 0);
+    const snk = intVal('flowSink', 0);
+    if (src === snk) { alert('Исток и сток не должны совпадать!'); return; }
+
+    const n = graph.n;
+    const maxCap = clamp(intVal('maxCapInput', 20), 1, 100);
+    const maxCst = clamp(intVal('maxCostInput', 10), 1, 100);
+
+    capacityMatrix = Array.from({ length: n }, () => new Array(n).fill(0));
+    costMatrix = Array.from({ length: n }, () => new Array(n).fill(0));
+
+    for (let i = 0; i < n; i++) {
+      for (let j = 0; j < n; j++) {
+        if (graph.adjMatrix[i][j] === 1) {
+          capacityMatrix[i][j] = Math.floor(Math.random() * maxCap) + 1;
+          costMatrix[i][j] = Math.floor(Math.random() * maxCst) + 1;
+        }
+      }
+    }
+
+    hasFlowNetwork = true;
+    lastMaxFlow = 0;
+
+    UIHelpers.displayMatrix('capacityMatrix', capacityMatrix, 0, 'weighted');
+    UIHelpers.displayMatrix('costMatrixDisplay', costMatrix, 0, 'weighted');
+
+    // Clear previous results
+    $('maxFlowText').textContent = '';
+    $('maxFlowMatrix').innerHTML = '';
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+  }
+
+  function onFindMaxFlow() {
+    if (!hasFlowNetwork) { alert('Сначала сгенерируйте сеть потоков!'); return; }
+
+    const src = intVal('flowSrc', 0);
+    const snk = intVal('flowSink', 0);
+
+    const result = MaxFlow.solve(capacityMatrix, src, snk);
+    lastMaxFlow = result.maxFlow;
+
+    let text = 'Максимальный поток: ' + result.maxFlow + '\n';
+    text += 'Количество увеличивающих путей: ' + result.iterations + '\n\n';
+
+    for (let i = 0; i < result.iterations; i++) {
+      text += 'Путь ' + (i + 1) + ': ' + result.augmentingPaths[i].join(' \u2192 ');
+      text += '  (поток: ' + result.pathFlows[i] + ')\n';
+    }
+
+    $('maxFlowText').textContent = text;
+    UIHelpers.displayMatrix('maxFlowMatrix', result.flowMatrix);
+
+    // Clear min cost flow results
+    $('minCostFlowText').textContent = '';
+    $('minCostFlowMatrix').innerHTML = '';
+  }
+
+  function onFindMinCostFlow() {
+    if (!hasFlowNetwork) { alert('Сначала сгенерируйте сеть потоков!'); return; }
+
+    const src = intVal('flowSrc', 0);
+    const snk = intVal('flowSink', 0);
+
+    // Compute max flow if not done yet
+    if (lastMaxFlow === 0) {
+      const mfResult = MaxFlow.solve(capacityMatrix, src, snk);
+      lastMaxFlow = mfResult.maxFlow;
+
+      if (lastMaxFlow === 0) {
+        $('minCostFlowText').textContent =
+          'Максимальный поток = 0 (нет пути из истока в сток).\n' +
+          'Поток минимальной стоимости не определён.';
+        return;
+      }
+    }
+
+    const desiredFlow = Math.floor((2 * lastMaxFlow) / 3);
+
+    if (desiredFlow === 0) {
+      $('minCostFlowText').textContent =
+        'Максимальный поток: ' + lastMaxFlow + '\n' +
+        'F = \u230a2/3 \u00d7 ' + lastMaxFlow + '\u230b = 0\n' +
+        'Требуемый поток = 0, стоимость = 0.';
+      return;
+    }
+
+    const result = MinCostFlow.solve(capacityMatrix, costMatrix, src, snk, desiredFlow);
+
+    let text = 'Максимальный поток: ' + lastMaxFlow + '\n';
+    text += 'Требуемый поток F = \u230a2/3 \u00d7 ' + lastMaxFlow + '\u230b = ' + desiredFlow + '\n';
+    text += 'Достигнутый поток: ' + result.flowValue + '\n';
+    text += 'Минимальная стоимость: ' + result.totalCost + '\n';
+
+    if (!result.feasible) {
+      text += '\n\u26a0 Невозможно отправить поток требуемой величины!\n';
+    }
+
+    text += '\nКоличество итераций: ' + result.iterations + '\n\n';
+
+    for (let i = 0; i < result.iterations; i++) {
+      text += 'Итерация ' + (i + 1) + ': ' + result.augmentingPaths[i].join(' \u2192 ');
+      text += '  (поток: ' + result.pathFlows[i] + ', стоимость пути: ' + result.pathCosts[i] + ')\n';
+    }
+
+    $('minCostFlowText').textContent = text;
+    UIHelpers.displayMatrix('minCostFlowMatrix', result.flowMatrix);
+  }
+
   // ---- Init ----
   document.addEventListener('DOMContentLoaded', function () {
     setupTabs();
@@ -370,6 +718,7 @@
     graphCanvas = new GraphCanvas(document.getElementById('graph-canvas'));
 
     $('generateBtn').addEventListener('click', onGenerate);
+    $('generateDAGBtn').addEventListener('click', onGenerateDAG);
     $('shimbelBtn').addEventListener('click', onShimbelCalculate);
     $('findRouteBtn').addEventListener('click', onFindRoute);
     $('bicompBtn').addEventListener('click', onFindBiComp);
@@ -378,6 +727,11 @@
     $('regenPosBtn').addEventListener('click', function () { onRegenerateWeights('positive'); });
     $('regenNegBtn').addEventListener('click', function () { onRegenerateWeights('negative'); });
     $('regenMixBtn').addEventListener('click', function () { onRegenerateWeights('mixed'); });
+    $('rearrangeDirBtn').addEventListener('click', onRearrangeDirected);
+    $('rearrangeUndirBtn').addEventListener('click', onRearrangeUndirected);
+    $('genFlowNetworkBtn').addEventListener('click', onGenerateFlowNetwork);
+    $('maxFlowBtn').addEventListener('click', onFindMaxFlow);
+    $('minCostFlowBtn').addEventListener('click', onFindMinCostFlow);
   });
 
 })();

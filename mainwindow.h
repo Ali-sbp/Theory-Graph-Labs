@@ -25,6 +25,7 @@ public:
 
 private slots:
     void onGenerate();
+    void onGenerateDAG();
     void onShimbelCalculate();
     void onFindRoute();
     void onFindBiComp();
@@ -34,6 +35,11 @@ private slots:
     void onRegenWeightsPositive();
     void onRegenWeightsNegative();
     void onRegenWeightsMixed();
+    void onRearrangeDirected();
+    void onRearrangeUndirected();
+    void onGenerateFlowNetwork();
+    void onFindMaxFlow();
+    void onFindMinCostFlow();
 
 private:
     void setupTab1(QWidget* tab);
@@ -42,6 +48,7 @@ private:
     void setupTab4(QWidget* tab);
     void setupTab5(QWidget* tab);
     void setupTab6(QWidget* tab);
+    void setupTab7(QWidget* tab);
 
     enum class MatrixMode { Default, Adjacency, Weighted };
 
@@ -101,6 +108,21 @@ private:
     QTextEdit*       cmpText_;
     QTableWidget*    cmpTable_;
 
+    // ---- Tab 7 widgets (Поток) ----
+    // Task 1
+    QSpinBox*     flowSrcVertex_;
+    QSpinBox*     flowSinkVertex_;
+    QSpinBox*     maxCapacity_;
+    QSpinBox*     maxCost_;
+    QTableWidget* capacityTable_;
+    QTableWidget* costTable_;
+    // Task 2
+    QTextEdit*    maxFlowText_;
+    QTableWidget* maxFlowTable_;
+    // Task 3
+    QTextEdit*    minCostFlowText_;
+    QTableWidget* minCostFlowTable_;
+
     // ---- Graph visualization ----
     QTabWidget*  tabs_;
     GraphWidget* graphWidget_;
@@ -108,4 +130,14 @@ private:
     // ---- State ----
     GraphData graph_;
     bool      hasGraph_ = false;
+
+    // ---- Original directed matrices (for directed/undirected rearrangement) ----
+    std::vector<std::vector<int>> originalAdjMatrix_;
+    std::vector<std::vector<int>> originalWeightMatrix_;
+
+    // ---- Flow network state ----
+    std::vector<std::vector<int>> capacityMatrix_;
+    std::vector<std::vector<int>> costMatrix_;
+    bool hasFlowNetwork_ = false;
+    int  lastMaxFlow_ = 0;
 };

@@ -5,6 +5,9 @@
 #include "routesearch.h"
 #include "bicomp.h"
 #include "dijkstraneg.h"
+#include "bellmanford.h"
+#include "maxflow.h"
+#include "mincostflow.h"
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
@@ -23,6 +26,7 @@
 #include <QVBoxLayout>
 
 #include <climits>
+#include <random>
 
 // -----------------------------------------------------------------------
 //  Constructor
@@ -45,6 +49,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     auto* tab4 = new QWidget;
     auto* tab5 = new QWidget;
     auto* tab6 = new QWidget;
+    auto* tab7 = new QWidget;
 
     setupTab1(tab1);
     setupTab2(tab2);
@@ -52,6 +57,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     setupTab4(tab4);
     setupTab5(tab5);
     setupTab6(tab6);
+    setupTab7(tab7);
 
     tabs_->addTab(tab1, "Граф и Анализ");
     tabs_->addTab(tab2, "Метод Шимбелла");
@@ -59,10 +65,11 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     tabs_->addTab(tab4, "Точки сочленения");
     tabs_->addTab(tab5, "Дейкстра (отр. веса)");
     tabs_->addTab(tab6, "Сравнение алгоритмов");
+    tabs_->addTab(tab7, "Поток");
 
     connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
 
-    setWindowTitle("Лаб. 1-2 — Теория графов");
+    setWindowTitle("Поток");
     resize(1400, 800);
 }
 
@@ -121,6 +128,10 @@ void MainWindow::setupTab1(QWidget* tab)
     auto* generateBtn = new QPushButton("Сгенерировать");
     connect(generateBtn, &QPushButton::clicked, this, &MainWindow::onGenerate);
     row2->addWidget(generateBtn);
+
+    auto* generateDAGBtn = new QPushButton("Сгенерировать DAG");
+    connect(generateDAGBtn, &QPushButton::clicked, this, &MainWindow::onGenerateDAG);
+    row2->addWidget(generateDAGBtn);
     layout->addLayout(row2);
 
     // --- Row 3: Regenerate weights buttons ---
@@ -141,6 +152,21 @@ void MainWindow::setupTab1(QWidget* tab)
 
     row3->addStretch();
     layout->addLayout(row3);
+
+    // --- Row 4: Rearrange directed/undirected buttons ---
+    auto* row4 = new QHBoxLayout;
+    row4->addWidget(new QLabel("Перестроить граф:"));
+
+    auto* rearrangeDirBtn = new QPushButton("Ориентированный");
+    connect(rearrangeDirBtn, &QPushButton::clicked, this, &MainWindow::onRearrangeDirected);
+    row4->addWidget(rearrangeDirBtn);
+
+    auto* rearrangeUndirBtn = new QPushButton("Неориентированный");
+    connect(rearrangeUndirBtn, &QPushButton::clicked, this, &MainWindow::onRearrangeUndirected);
+    row4->addWidget(rearrangeUndirBtn);
+
+    row4->addStretch();
+    layout->addLayout(row4);
 
     // --- Matrices side-by-side ---
     auto* splitter = new QSplitter(Qt::Horizontal);
@@ -266,6 +292,10 @@ void MainWindow::onGenerate()
     graph_    = GraphGenerator::generate(n, p, dir, wt, wp);
     hasGraph_ = true;
 
+    // Store original matrices for directed/undirected rearrangement
+    originalAdjMatrix_    = graph_.adjMatrix;
+    originalWeightMatrix_ = graph_.weightMatrix;
+
     // Update graph visualization
     graphWidget_->setGraph(graph_);
 
@@ -292,6 +322,16 @@ void MainWindow::onGenerate()
     dijkWeightTable_->setRowCount(0);
     dijkWeightTable_->setColumnCount(0);
     cmpText_->clear();
+
+    // Clear Tab 7 (Поток)
+    capacityTable_->clear();  capacityTable_->setRowCount(0);  capacityTable_->setColumnCount(0);
+    costTable_->clear();      costTable_->setRowCount(0);      costTable_->setColumnCount(0);
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+    hasFlowNetwork_ = false;
+    lastMaxFlow_ = 0;
 
     // Display matrices
     displayMatrix(adjTable_,    graph_.adjMatrix, 0, MatrixMode::Adjacency);
@@ -347,12 +387,140 @@ void MainWindow::onGenerate()
     dijkDstVertex_->setRange(0, std::max(0, n - 1));
     if (n > 1) dijkDstVertex_->setValue(1);
 
+    // Update Tab 7 spin boxes
+    flowSrcVertex_->setRange(0, std::max(0, n - 1));
+    flowSinkVertex_->setRange(0, std::max(0, n - 1));
+    if (n > 1) flowSinkVertex_->setValue(n - 1);
+
     // Update Tab 5 weight type label
     if (positiveRadio_->isChecked())
         dijkWeightTypeLabel_->setText("Тип весов: Положительные");
     else if (negativeRadio_->isChecked())
         dijkWeightTypeLabel_->setText("Тип весов: Отрицательные");
     else
+        dijkWeightTypeLabel_->setText("Тип весов: Смешанные");
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Generate DAG (richer connectivity for flow algorithms)
+// -----------------------------------------------------------------------
+void MainWindow::onGenerateDAG()
+{
+    const int n        = vertexCount_->value();
+    const double p     = paramP_->value();
+    const double wp    = weightParamP_->value();
+
+    const bool dir = directedCheck_->isChecked();
+
+    WeightType wt = WeightType::Positive;
+    if (negativeRadio_->isChecked()) wt = WeightType::Negative;
+    else if (mixedRadio_->isChecked()) wt = WeightType::Mixed;
+
+    graph_    = GraphGenerator::generateDAG(n, p, dir, wt, wp);
+    hasGraph_ = true;
+
+    // Store original matrices for directed/undirected rearrangement
+    originalAdjMatrix_    = graph_.adjMatrix;
+    originalWeightMatrix_ = graph_.weightMatrix;
+
+    // Update graph visualization
+    graphWidget_->setGraph(graph_);
+
+    // Clear stale results on other tabs
+    minTable_->clear();
+    minTable_->setRowCount(0);
+    minTable_->setColumnCount(0);
+    maxTable_->clear();
+    maxTable_->setRowCount(0);
+    maxTable_->setColumnCount(0);
+    routeTable_->clear();
+    routeTable_->setRowCount(0);
+    routeTable_->setColumnCount(0);
+    routeText_->clear();
+    bicompText_->clear();
+    bicompTable_->clear();
+    bicompTable_->setRowCount(0);
+    bicompTable_->setColumnCount(0);
+    dijkText_->clear();
+    dijkStagesTable_->clear();
+    dijkStagesTable_->setRowCount(0);
+    dijkStagesTable_->setColumnCount(0);
+    dijkWeightTable_->clear();
+    dijkWeightTable_->setRowCount(0);
+    dijkWeightTable_->setColumnCount(0);
+    cmpText_->clear();
+
+    // Clear Tab 7 (Поток)
+    capacityTable_->clear();  capacityTable_->setRowCount(0);  capacityTable_->setColumnCount(0);
+    costTable_->clear();      costTable_->setRowCount(0);      costTable_->setColumnCount(0);
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+    hasFlowNetwork_ = false;
+    lastMaxFlow_ = 0;
+
+    // Display matrices
+    displayMatrix(adjTable_,    graph_.adjMatrix, 0, MatrixMode::Adjacency);
+    displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
+
+    // --- Analysis ---
+    auto res = GraphAnalysis::analyze(graph_.adjMatrix, dir);
+
+    QString text;
+
+    if (n == 1) {
+        text += "Граф состоит из одной вершины (без рёбер).\n\n";
+        text += "Эксцентриситет: v0 = 0\n";
+        text += "Центр графа: { 0 }\n";
+        text += "Диаметр: 0\n";
+        text += "Диаметральные вершины: { 0 }";
+        analysisText_->setText(text);
+        fromVertex_->setRange(0, 0);
+        toVertex_->setRange(0, 0);
+        pathLength_->setRange(1, 1);
+        return;
+    }
+
+    text += "Эксцентриситеты:\n";
+    for (int i = 0; i < n; ++i) {
+        text += QString("  v%1 = %2\n").arg(i).arg(res.eccentricities[i]);
+    }
+
+    text += "\nЦентр графа: { ";
+    for (size_t i = 0; i < res.center.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.center[i]);
+    }
+    text += " }\n";
+
+    text += QString("Диаметр: %1\n").arg(res.diameter);
+
+    text += "Диаметральные вершины: { ";
+    for (size_t i = 0; i < res.diametralVertices.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.diametralVertices[i]);
+    }
+    text += " }";
+
+    analysisText_->setText(text);
+
+    // Update spin-boxes on other tabs
+    pathLength_->setRange(0, std::max(1, n - 1));
+    fromVertex_->setRange(0, n - 1);
+    toVertex_->setRange(0, n - 1);
+    dijkSrcVertex_->setRange(0, n - 1);
+    dijkDstVertex_->setRange(0, std::max(0, n - 1));
+    if (n > 1) dijkDstVertex_->setValue(1);
+
+    flowSrcVertex_->setRange(0, std::max(0, n - 1));
+    flowSinkVertex_->setRange(0, std::max(0, n - 1));
+    if (n > 1) flowSinkVertex_->setValue(n - 1);
+
+    dijkWeightTypeLabel_->setText("Тип весов: Положительные");
+    if (negativeRadio_->isChecked())
+        dijkWeightTypeLabel_->setText("Тип весов: Отрицательные");
+    else if (mixedRadio_->isChecked())
         dijkWeightTypeLabel_->setText("Тип весов: Смешанные");
 }
 
@@ -917,6 +1085,16 @@ void MainWindow::doRegenerateWeights(WeightType wType)
     dijkWeightTable_->clear();  dijkWeightTable_->setRowCount(0);  dijkWeightTable_->setColumnCount(0);
     cmpText_->clear();
 
+    // Clear Tab 7 (Поток)
+    capacityTable_->clear();  capacityTable_->setRowCount(0);  capacityTable_->setColumnCount(0);
+    costTable_->clear();      costTable_->setRowCount(0);      costTable_->setColumnCount(0);
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+    hasFlowNetwork_ = false;
+    lastMaxFlow_ = 0;
+
     // Update weight type label on Dijkstra tab
     if (wType == WeightType::Positive)
         dijkWeightTypeLabel_->setText("Тип весов: Положительные");
@@ -924,6 +1102,144 @@ void MainWindow::doRegenerateWeights(WeightType wType)
         dijkWeightTypeLabel_->setText("Тип весов: Отрицательные");
     else
         dijkWeightTypeLabel_->setText("Тип весов: Смешанные");
+}
+
+// -----------------------------------------------------------------------
+//  Slots: Rearrange graph as directed / undirected
+// -----------------------------------------------------------------------
+void MainWindow::onRearrangeDirected()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    // Restore original directed matrices
+    graph_.adjMatrix    = originalAdjMatrix_;
+    graph_.weightMatrix = originalWeightMatrix_;
+    graph_.directed     = true;
+    directedCheck_->setChecked(true);
+
+    // Refresh display
+    graphWidget_->setGraph(graph_);
+    displayMatrix(adjTable_,    graph_.adjMatrix,    0, MatrixMode::Adjacency);
+    displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
+
+    // Re-run analysis with directed flag
+    const int n = graph_.n;
+    auto res = GraphAnalysis::analyze(graph_.adjMatrix, true);
+    QString text;
+    text += "Эксцентриситеты:\n";
+    for (int i = 0; i < n; ++i)
+        text += QString("  v%1 = %2\n").arg(i).arg(res.eccentricities[i]);
+    text += "\nЦентр графа: { ";
+    for (size_t i = 0; i < res.center.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.center[i]);
+    }
+    text += " }\n";
+    text += QString("Диаметр: %1\n").arg(res.diameter);
+    text += "Диаметральные вершины: { ";
+    for (size_t i = 0; i < res.diametralVertices.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.diametralVertices[i]);
+    }
+    text += " }";
+    analysisText_->setText(text);
+
+    // Clear downstream results
+    minTable_->clear();  minTable_->setRowCount(0);  minTable_->setColumnCount(0);
+    maxTable_->clear();  maxTable_->setRowCount(0);  maxTable_->setColumnCount(0);
+    dijkText_->clear();
+    dijkStagesTable_->clear();  dijkStagesTable_->setRowCount(0);  dijkStagesTable_->setColumnCount(0);
+    dijkWeightTable_->clear();  dijkWeightTable_->setRowCount(0);  dijkWeightTable_->setColumnCount(0);
+    cmpText_->clear();
+    capacityTable_->clear();  capacityTable_->setRowCount(0);  capacityTable_->setColumnCount(0);
+    costTable_->clear();      costTable_->setRowCount(0);      costTable_->setColumnCount(0);
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+    hasFlowNetwork_ = false;
+    lastMaxFlow_ = 0;
+}
+
+void MainWindow::onRearrangeUndirected()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    const int n = graph_.n;
+
+    // Build undirected acyclic graph from original edges.
+    // Add each original edge as undirected only if it doesn't create a cycle.
+    std::vector<std::vector<int>> newAdj(n, std::vector<int>(n, 0));
+    std::vector<std::vector<int>> newWeight(n, std::vector<int>(n, 0));
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (i != j && originalAdjMatrix_[i][j] && !newAdj[i][j]) {
+                // Check if i and j are already connected undirectedly
+                if (!GraphGenerator::canReachUndirected(newAdj, i, j)) {
+                    newAdj[i][j] = 1;
+                    newAdj[j][i] = 1;
+                    int w = originalWeightMatrix_[i][j] != 0 ? originalWeightMatrix_[i][j]
+                                                             : originalWeightMatrix_[j][i];
+                    newWeight[i][j] = w;
+                    newWeight[j][i] = w;
+                }
+            }
+        }
+    }
+
+    graph_.adjMatrix    = newAdj;
+    graph_.weightMatrix = newWeight;
+    graph_.directed = false;
+    directedCheck_->setChecked(false);
+
+    // Refresh display
+    graphWidget_->setGraph(graph_);
+    displayMatrix(adjTable_,    graph_.adjMatrix,    0, MatrixMode::Adjacency);
+    displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
+
+    // Re-run analysis with undirected flag
+    auto res = GraphAnalysis::analyze(graph_.adjMatrix, false);
+    QString text;
+    text += "Эксцентриситеты:\n";
+    for (int i = 0; i < n; ++i)
+        text += QString("  v%1 = %2\n").arg(i).arg(res.eccentricities[i]);
+    text += "\nЦентр графа: { ";
+    for (size_t i = 0; i < res.center.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.center[i]);
+    }
+    text += " }\n";
+    text += QString("Диаметр: %1\n").arg(res.diameter);
+    text += "Диаметральные вершины: { ";
+    for (size_t i = 0; i < res.diametralVertices.size(); ++i) {
+        if (i) text += ", ";
+        text += QString::number(res.diametralVertices[i]);
+    }
+    text += " }";
+    analysisText_->setText(text);
+
+    // Clear downstream results
+    minTable_->clear();  minTable_->setRowCount(0);  minTable_->setColumnCount(0);
+    maxTable_->clear();  maxTable_->setRowCount(0);  maxTable_->setColumnCount(0);
+    dijkText_->clear();
+    dijkStagesTable_->clear();  dijkStagesTable_->setRowCount(0);  dijkStagesTable_->setColumnCount(0);
+    dijkWeightTable_->clear();  dijkWeightTable_->setRowCount(0);  dijkWeightTable_->setColumnCount(0);
+    cmpText_->clear();
+    capacityTable_->clear();  capacityTable_->setRowCount(0);  capacityTable_->setColumnCount(0);
+    costTable_->clear();      costTable_->setRowCount(0);      costTable_->setColumnCount(0);
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+    hasFlowNetwork_ = false;
+    lastMaxFlow_ = 0;
 }
 
 // -----------------------------------------------------------------------
@@ -937,9 +1253,276 @@ void MainWindow::onTabChanged(int index)
     case 0:
     case 1:
     case 5:
+    case 6:
         graphWidget_->clearHighlights();
         break;
     default:
         break;
     }
+}
+
+// -----------------------------------------------------------------------
+//  Tab 7 — Поток (Network Flows)
+// -----------------------------------------------------------------------
+void MainWindow::setupTab7(QWidget* tab)
+{
+    auto* layout = new QVBoxLayout(tab);
+
+    // ===== ЗАДАНИЕ 1: Генерация сети =====
+    auto* task1 = new QGroupBox("Задание 1: Генерация сети");
+    auto* task1Layout = new QVBoxLayout(task1);
+
+    auto* row1 = new QHBoxLayout;
+    row1->addWidget(new QLabel("Исток:"));
+    flowSrcVertex_ = new QSpinBox;
+    flowSrcVertex_->setRange(0, 0);
+    row1->addWidget(flowSrcVertex_);
+
+    row1->addSpacing(12);
+    row1->addWidget(new QLabel("Сток:"));
+    flowSinkVertex_ = new QSpinBox;
+    flowSinkVertex_->setRange(0, 0);
+    row1->addWidget(flowSinkVertex_);
+    row1->addStretch();
+    task1Layout->addLayout(row1);
+
+    auto* row2 = new QHBoxLayout;
+    row2->addWidget(new QLabel("Макс. пропускная способность:"));
+    maxCapacity_ = new QSpinBox;
+    maxCapacity_->setRange(1, 100);
+    maxCapacity_->setValue(20);
+    row2->addWidget(maxCapacity_);
+
+    row2->addSpacing(12);
+    row2->addWidget(new QLabel("Макс. стоимость:"));
+    maxCost_ = new QSpinBox;
+    maxCost_->setRange(1, 100);
+    maxCost_->setValue(10);
+    row2->addWidget(maxCost_);
+
+    row2->addSpacing(12);
+    auto* genNetBtn = new QPushButton("Сгенерировать сеть");
+    connect(genNetBtn, &QPushButton::clicked, this, &MainWindow::onGenerateFlowNetwork);
+    row2->addWidget(genNetBtn);
+    row2->addStretch();
+    task1Layout->addLayout(row2);
+
+    auto* matricesSplitter = new QSplitter(Qt::Horizontal);
+    auto* capWidget = new QWidget;
+    auto* capLayout = new QVBoxLayout(capWidget);
+    capLayout->setContentsMargins(0, 0, 0, 0);
+    capLayout->addWidget(new QLabel("Матрица пропускных способностей"));
+    capacityTable_ = new QTableWidget;
+    capLayout->addWidget(capacityTable_, 1);
+    matricesSplitter->addWidget(capWidget);
+
+    auto* costWidget = new QWidget;
+    auto* costLayout = new QVBoxLayout(costWidget);
+    costLayout->setContentsMargins(0, 0, 0, 0);
+    costLayout->addWidget(new QLabel("Матрица стоимостей"));
+    costTable_ = new QTableWidget;
+    costLayout->addWidget(costTable_, 1);
+    matricesSplitter->addWidget(costWidget);
+
+    task1Layout->addWidget(matricesSplitter, 1);
+    layout->addWidget(task1, 2);
+
+    // ===== ЗАДАНИЕ 2: Максимальный поток =====
+    auto* task2 = new QGroupBox("Задание 2: Максимальный поток (Форд-Фалкерсон)");
+    auto* task2Layout = new QVBoxLayout(task2);
+
+    auto* maxFlowBtn = new QPushButton("Найти макс. поток");
+    connect(maxFlowBtn, &QPushButton::clicked, this, &MainWindow::onFindMaxFlow);
+    task2Layout->addWidget(maxFlowBtn);
+
+    maxFlowText_ = new QTextEdit;
+    maxFlowText_->setReadOnly(true);
+    maxFlowText_->setMaximumHeight(150);
+    task2Layout->addWidget(maxFlowText_);
+
+    task2Layout->addWidget(new QLabel("Матрица потока"));
+    maxFlowTable_ = new QTableWidget;
+    task2Layout->addWidget(maxFlowTable_, 1);
+
+    layout->addWidget(task2, 2);
+
+    // ===== ЗАДАНИЕ 3: Поток минимальной стоимости =====
+    auto* task3 = new QGroupBox("Задание 3: Поток минимальной стоимости");
+    auto* task3Layout = new QVBoxLayout(task3);
+
+    auto* minCostBtn = new QPushButton("Найти мин. стоимость потока");
+    connect(minCostBtn, &QPushButton::clicked, this, &MainWindow::onFindMinCostFlow);
+    task3Layout->addWidget(minCostBtn);
+
+    minCostFlowText_ = new QTextEdit;
+    minCostFlowText_->setReadOnly(true);
+    minCostFlowText_->setMaximumHeight(150);
+    task3Layout->addWidget(minCostFlowText_);
+
+    task3Layout->addWidget(new QLabel("Матрица потока (мин. стоимость)"));
+    minCostFlowTable_ = new QTableWidget;
+    task3Layout->addWidget(minCostFlowTable_, 1);
+
+    layout->addWidget(task3, 2);
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Generate flow network (Task 1)
+// -----------------------------------------------------------------------
+void MainWindow::onGenerateFlowNetwork()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+    if (!graph_.directed) {
+        QMessageBox::warning(this, "Внимание",
+            "Для задачи о потоках граф должен быть ориентированным.\n"
+            "Пожалуйста, сгенерируйте ориентированный граф.");
+        return;
+    }
+
+    const int src = flowSrcVertex_->value();
+    const int snk = flowSinkVertex_->value();
+    if (src == snk) {
+        QMessageBox::warning(this, "Внимание", "Исток и сток не должны совпадать!");
+        return;
+    }
+
+    const int n = graph_.n;
+    const int maxCap = maxCapacity_->value();
+    const int maxCst = maxCost_->value();
+
+    std::mt19937 rng(std::random_device{}());
+    std::uniform_int_distribution<int> capDist(1, maxCap);
+    std::uniform_int_distribution<int> costDist(1, maxCst);
+
+    capacityMatrix_.assign(n, std::vector<int>(n, 0));
+    costMatrix_.assign(n, std::vector<int>(n, 0));
+
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (graph_.adjMatrix[i][j] == 1) {
+                capacityMatrix_[i][j] = capDist(rng);
+                costMatrix_[i][j] = costDist(rng);
+            }
+        }
+    }
+
+    hasFlowNetwork_ = true;
+    lastMaxFlow_ = 0;
+
+    displayMatrix(capacityTable_, capacityMatrix_, 0, MatrixMode::Weighted);
+    displayMatrix(costTable_, costMatrix_, 0, MatrixMode::Weighted);
+
+    // Clear previous results
+    maxFlowText_->clear();
+    maxFlowTable_->clear();   maxFlowTable_->setRowCount(0);   maxFlowTable_->setColumnCount(0);
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Find maximum flow (Task 2)
+// -----------------------------------------------------------------------
+void MainWindow::onFindMaxFlow()
+{
+    if (!hasFlowNetwork_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте сеть потоков!");
+        return;
+    }
+
+    const int src = flowSrcVertex_->value();
+    const int snk = flowSinkVertex_->value();
+
+    auto result = MaxFlow::solve(capacityMatrix_, src, snk);
+    lastMaxFlow_ = result.maxFlow;
+
+    QString text;
+    text += QString("Максимальный поток: %1\n").arg(result.maxFlow);
+    text += QString("Количество увеличивающих путей: %1\n\n").arg(result.iterations);
+
+    for (int i = 0; i < result.iterations; ++i) {
+        text += QString("Путь %1: ").arg(i + 1);
+        const auto& path = result.augmentingPaths[i];
+        for (size_t j = 0; j < path.size(); ++j) {
+            if (j) text += " → ";
+            text += QString::number(path[j]);
+        }
+        text += QString("  (поток: %1)\n").arg(result.pathFlows[i]);
+    }
+
+    maxFlowText_->setText(text);
+    displayMatrix(maxFlowTable_, result.flowMatrix);
+
+    // Clear min cost flow results since max flow may have changed
+    minCostFlowText_->clear();
+    minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Find minimum cost flow (Task 3)
+// -----------------------------------------------------------------------
+void MainWindow::onFindMinCostFlow()
+{
+    if (!hasFlowNetwork_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте сеть потоков!");
+        return;
+    }
+
+    const int src = flowSrcVertex_->value();
+    const int snk = flowSinkVertex_->value();
+
+    // If max flow hasn't been computed yet, compute it now
+    if (lastMaxFlow_ == 0) {
+        auto mfResult = MaxFlow::solve(capacityMatrix_, src, snk);
+        lastMaxFlow_ = mfResult.maxFlow;
+
+        if (lastMaxFlow_ == 0) {
+            minCostFlowText_->setText(
+                "Максимальный поток = 0 (нет пути из истока в сток).\n"
+                "Поток минимальной стоимости не определён.");
+            return;
+        }
+    }
+
+    const int desiredFlow = (2 * lastMaxFlow_) / 3;
+
+    if (desiredFlow == 0) {
+        minCostFlowText_->setText(
+            QString("Максимальный поток: %1\n"
+                    "F = ⌊2/3 × %1⌋ = 0\n"
+                    "Требуемый поток = 0, стоимость = 0.")
+                .arg(lastMaxFlow_));
+        return;
+    }
+
+    auto result = MinCostFlow::solve(capacityMatrix_, costMatrix_, src, snk, desiredFlow);
+
+    QString text;
+    text += QString("Максимальный поток: %1\n").arg(lastMaxFlow_);
+    text += QString("Требуемый поток F = ⌊2/3 × %1⌋ = %2\n").arg(lastMaxFlow_).arg(desiredFlow);
+    text += QString("Достигнутый поток: %1\n").arg(result.flowValue);
+    text += QString("Минимальная стоимость: %1\n").arg(result.totalCost);
+
+    if (!result.feasible) {
+        text += "\n⚠ Невозможно отправить поток требуемой величины!\n";
+    }
+
+    text += QString("\nКоличество итераций: %1\n\n").arg(result.iterations);
+
+    for (int i = 0; i < result.iterations; ++i) {
+        text += QString("Итерация %1: ").arg(i + 1);
+        const auto& path = result.augmentingPaths[i];
+        for (size_t j = 0; j < path.size(); ++j) {
+            if (j) text += " → ";
+            text += QString::number(path[j]);
+        }
+        text += QString("  (поток: %1, стоимость пути: %2)\n")
+                    .arg(result.pathFlows[i])
+                    .arg(result.pathCosts[i]);
+    }
+
+    minCostFlowText_->setText(text);
+    displayMatrix(minCostFlowTable_, result.flowMatrix);
 }
