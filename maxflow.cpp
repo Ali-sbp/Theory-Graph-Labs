@@ -57,6 +57,12 @@ MaxFlowResult MaxFlow::solve(const std::vector<std::vector<int>>& capacityMatrix
         res.augmentingPaths.push_back(path);
         res.pathFlows.push_back(pathFlow);
 
+        // Determine forward/backward edge types
+        std::vector<bool> edgeTypes;
+        for (size_t k = 0; k + 1 < path.size(); ++k)
+            edgeTypes.push_back(capacityMatrix[path[k]][path[k + 1]] == 0);
+        res.pathEdgeTypes.push_back(edgeTypes);
+
         // Update residual graph and flow
         for (int v = sink; v != source; v = parent[v]) {
             int u = parent[v];

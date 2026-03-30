@@ -59,7 +59,8 @@ private:
     void displayMatrix(QTableWidget* table,
                        const std::vector<std::vector<int>>& matrix,
                        int sentinel = 0,
-                       MatrixMode mode = MatrixMode::Default);
+                       MatrixMode mode = MatrixMode::Default,
+                       bool editable = false);
     void highlightPath(QTableWidget* table,
                        const std::vector<std::pair<int,int>>& edges);
     void highlightCells(QTableWidget* table,

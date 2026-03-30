@@ -7,6 +7,7 @@ window.MaxFlow = {
         const residual = capacityMatrix.map(row => row.slice());
         const augmentingPaths = [];
         const pathFlows = [];
+        const pathEdgeTypes = [];
         let maxFlow = 0;
         let iterations = 0;
 
@@ -50,6 +51,12 @@ window.MaxFlow = {
             augmentingPaths.push(path);
             pathFlows.push(pathFlow);
 
+            // Determine forward/backward edge types
+            const edgeTypes = [];
+            for (let k = 0; k + 1 < path.length; k++)
+                edgeTypes.push(capacityMatrix[path[k]][path[k + 1]] === 0);
+            pathEdgeTypes.push(edgeTypes);
+
             // Update residual graph and flow
             for (let v = sink; v !== source; v = parent[v]) {
                 const u = parent[v];
@@ -69,6 +76,6 @@ window.MaxFlow = {
                 if (flowMatrix[i][j] < 0)
                     flowMatrix[i][j] = 0;
 
-        return { maxFlow, flowMatrix, iterations, augmentingPaths, pathFlows };
+        return { maxFlow, flowMatrix, iterations, augmentingPaths, pathFlows, pathEdgeTypes };
     }
 };

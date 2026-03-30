@@ -18,6 +18,7 @@
   let costMatrix = null;
   let hasFlowNetwork = false;
   let lastMaxFlow = 0;
+  let lastMaxFlowResult = null;
 
   // ---- Helpers ----
   function $(id) { return document.getElementById(id); }
@@ -50,6 +51,16 @@
         // Clear highlights on plain-graph tabs (matching onTabChanged)
         if (tab === 0 || tab === 1 || tab === 5 || tab === 6) {
           if (graphCanvas) graphCanvas.clearHighlights();
+        }
+
+        // Swap edge labels for flow tab
+        if (graphCanvas) {
+          if (tab === 6 && hasFlowNetwork && capacityMatrix) {
+            graphCanvas.setEdgeLabels(capacityMatrix);
+          } else {
+            graphCanvas.clearEdgeLabels();
+            graphCanvas.clearFlowLabels();
+          }
         }
       });
     });
@@ -624,9 +635,16 @@
 
     hasFlowNetwork = true;
     lastMaxFlow = 0;
+    lastMaxFlowResult = null;
 
-    UIHelpers.displayMatrix('capacityMatrix', capacityMatrix, 0, 'weighted');
-    UIHelpers.displayMatrix('costMatrixDisplay', costMatrix, 0, 'weighted');
+    UIHelpers.displayEditableMatrix('capacityMatrix', capacityMatrix, 0, 'weighted');
+    UIHelpers.displayEditableMatrix('costMatrixDisplay', costMatrix, 0, 'weighted');
+
+    // Show capacity labels on visual graph
+    if (graphCanvas) {
+      graphCanvas.clearFlowLabels();
+      graphCanvas.setEdgeLabels(capacityMatrix);
+    }
 
     // Clear previous results
     $('maxFlowText').textContent = '';
@@ -641,19 +659,45 @@
     const src = intVal('flowSrc', 0);
     const snk = intVal('flowSink', 0);
 
+    // Read back user-edited values
+    capacityMatrix = UIHelpers.readMatrixFromTable('capacityMatrix', graph.n);
+
     const result = MaxFlow.solve(capacityMatrix, src, snk);
     lastMaxFlow = result.maxFlow;
+    lastMaxFlowResult = result;
 
-    let text = 'Максимальный поток: ' + result.maxFlow + '\n';
-    text += 'Количество увеличивающих путей: ' + result.iterations + '\n\n';
+    let html = 'Максимальный поток: ' + result.maxFlow + '\n';
+    html += 'Количество увеличивающих путей: ' + result.iterations + '\n\n';
 
     for (let i = 0; i < result.iterations; i++) {
-      text += 'Путь ' + (i + 1) + ': ' + result.augmentingPaths[i].join(' \u2192 ');
-      text += '  (поток: ' + result.pathFlows[i] + ')\n';
+      const path = result.augmentingPaths[i];
+      const types = result.pathEdgeTypes[i];
+      let pathStr = String(path[0]);
+      for (let j = 1; j < path.length; j++) {
+        pathStr += types[j - 1] ? ' &rarr;(обр.) ' : ' &rarr; ';
+        pathStr += path[j];
+      }
+      html += '<span class="flow-path-line" data-path-index="' + i + '">'
+           + 'Путь ' + (i + 1) + ': ' + pathStr
+           + '  (поток: ' + result.pathFlows[i] + ')'
+           + '</span>\n';
     }
 
-    $('maxFlowText').textContent = text;
+    $('maxFlowText').innerHTML = html;
     UIHelpers.displayMatrix('maxFlowMatrix', result.flowMatrix);
+
+    // Show flow/capacity labels on sink edges in visual graph
+    if (graphCanvas) {
+      graphCanvas.setFlowLabels(result.flowMatrix, capacityMatrix, snk);
+    }
+
+    // Attach hover handlers to path lines
+    document.querySelectorAll('#maxFlowText .flow-path-line').forEach(function (span) {
+      span.addEventListener('mouseenter', function () {
+        onFlowPathHover(parseInt(this.dataset.pathIndex, 10));
+      });
+      span.addEventListener('mouseleave', onFlowPathUnhover);
+    });
 
     // Clear min cost flow results
     $('minCostFlowText').textContent = '';
@@ -665,6 +709,10 @@
 
     const src = intVal('flowSrc', 0);
     const snk = intVal('flowSink', 0);
+
+    // Read back user-edited values
+    capacityMatrix = UIHelpers.readMatrixFromTable('capacityMatrix', graph.n);
+    costMatrix = UIHelpers.readMatrixFromTable('costMatrixDisplay', graph.n);
 
     // Compute max flow if not done yet
     if (lastMaxFlow === 0) {
@@ -709,6 +757,59 @@
 
     $('minCostFlowText').textContent = text;
     UIHelpers.displayMatrix('minCostFlowMatrix', result.flowMatrix);
+  }
+
+  // ---- Flow path hover handlers ----
+
+  function onFlowPathHover(pathIndex) {
+    if (!lastMaxFlowResult || pathIndex >= lastMaxFlowResult.augmentingPaths.length) return;
+    const path = lastMaxFlowResult.augmentingPaths[pathIndex];
+    const edgeTypes = lastMaxFlowResult.pathEdgeTypes[pathIndex];
+
+    // Highlight edges in the capacity matrix
+    const container = document.getElementById('capacityMatrix');
+    if (container) {
+      for (let k = 0; k + 1 < path.length; k++) {
+        const u = path[k], v = path[k + 1];
+        let cell;
+        if (edgeTypes[k]) {
+          // Backward edge: highlight the original direction (v→u) in orange
+          cell = container.querySelector('td[data-row="' + v + '"][data-col="' + u + '"]');
+          if (cell) cell.classList.add('cell-highlight-orange');
+        } else {
+          // Forward edge: highlight u→v in green
+          cell = container.querySelector('td[data-row="' + u + '"][data-col="' + v + '"]');
+          if (cell) cell.classList.add('cell-highlight-green');
+        }
+      }
+    }
+
+    // Highlight on visual graph
+    if (graphCanvas) {
+      graphCanvas.highlightFlowPath(path, edgeTypes);
+    }
+  }
+
+  function onFlowPathUnhover() {
+    // Remove all highlights from capacity matrix
+    const container = document.getElementById('capacityMatrix');
+    if (container) {
+      container.querySelectorAll('.cell-highlight-green').forEach(function (el) {
+        el.classList.remove('cell-highlight-green');
+      });
+      container.querySelectorAll('.cell-highlight-orange').forEach(function (el) {
+        el.classList.remove('cell-highlight-orange');
+      });
+    }
+
+    // Clear visual graph highlights
+    if (graphCanvas) {
+      graphCanvas.clearHighlights();
+      // Restore edge labels if we have a flow network
+      if (hasFlowNetwork && capacityMatrix) {
+        graphCanvas.setEdgeLabels(capacityMatrix);
+      }
+    }
   }
 
   // ---- Init ----

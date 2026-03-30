@@ -620,7 +620,8 @@ void MainWindow::onFindRoute()
 void MainWindow::displayMatrix(QTableWidget* table,
                                const std::vector<std::vector<int>>& matrix,
                                int sentinel,
-                               MatrixMode mode)
+                               MatrixMode mode,
+                               bool editable)
 {
     const int n = static_cast<int>(matrix.size());
     table->clear();
@@ -636,20 +637,24 @@ void MainWindow::displayMatrix(QTableWidget* table,
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             QString text;
-            if (sentinel > 0 && matrix[i][j] >= sentinel)
-                text = QString::fromUtf8("∞");
-            else if (sentinel < 0 && matrix[i][j] <= sentinel)
-                text = QString::fromUtf8("∞");
-            else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Weighted)
-                text = QString::fromUtf8("∞");
-            else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Adjacency)
-                text = QStringLiteral("-");
-            else
+            if (editable) {
                 text = QString::number(matrix[i][j]);
+            } else if (sentinel > 0 && matrix[i][j] >= sentinel) {
+                text = QString::fromUtf8("∞");
+            } else if (sentinel < 0 && matrix[i][j] <= sentinel) {
+                text = QString::fromUtf8("∞");
+            } else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Weighted) {
+                text = QString::fromUtf8("∞");
+            } else if (i != j && matrix[i][j] == 0 && mode == MatrixMode::Adjacency) {
+                text = QStringLiteral("-");
+            } else {
+                text = QString::number(matrix[i][j]);
+            }
 
             auto* item = new QTableWidgetItem(text);
             item->setTextAlignment(Qt::AlignCenter);
-            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            if (!editable || i == j)
+                item->setFlags(item->flags() & ~Qt::ItemIsEditable);
             table->setItem(i, j, item);
         }
     }
@@ -1412,8 +1417,8 @@ void MainWindow::onGenerateFlowNetwork()
     hasFlowNetwork_ = true;
     lastMaxFlow_ = 0;
 
-    displayMatrix(capacityTable_, capacityMatrix_, 0, MatrixMode::Weighted);
-    displayMatrix(costTable_, costMatrix_, 0, MatrixMode::Weighted);
+    displayMatrix(capacityTable_, capacityMatrix_, 0, MatrixMode::Default, true);
+    displayMatrix(costTable_, costMatrix_, 0, MatrixMode::Default, true);
 
     // Clear previous results
     maxFlowText_->clear();
@@ -1435,6 +1440,18 @@ void MainWindow::onFindMaxFlow()
     const int src = flowSrcVertex_->value();
     const int snk = flowSinkVertex_->value();
 
+    // Read user-edited capacity values back from the table
+    const int n = graph_.n;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (auto* item = capacityTable_->item(i, j)) {
+                bool ok;
+                int v = item->text().toInt(&ok);
+                capacityMatrix_[i][j] = (ok && v >= 0) ? v : 0;
+            }
+        }
+    }
+
     auto result = MaxFlow::solve(capacityMatrix_, src, snk);
     lastMaxFlow_ = result.maxFlow;
 
@@ -1445,8 +1462,14 @@ void MainWindow::onFindMaxFlow()
     for (int i = 0; i < result.iterations; ++i) {
         text += QString("Путь %1: ").arg(i + 1);
         const auto& path = result.augmentingPaths[i];
+        const auto& edgeTypes = result.pathEdgeTypes[i];
         for (size_t j = 0; j < path.size(); ++j) {
-            if (j) text += " → ";
+            if (j > 0) {
+                if (edgeTypes[j - 1])
+                    text += QString::fromUtf8(" →(обр.) ");
+                else
+                    text += " → ";
+            }
             text += QString::number(path[j]);
         }
         text += QString("  (поток: %1)\n").arg(result.pathFlows[i]);
@@ -1472,6 +1495,23 @@ void MainWindow::onFindMinCostFlow()
 
     const int src = flowSrcVertex_->value();
     const int snk = flowSinkVertex_->value();
+
+    // Read user-edited capacity and cost values back from the tables
+    const int n = graph_.n;
+    for (int i = 0; i < n; ++i) {
+        for (int j = 0; j < n; ++j) {
+            if (auto* item = capacityTable_->item(i, j)) {
+                bool ok;
+                int v = item->text().toInt(&ok);
+                capacityMatrix_[i][j] = (ok && v >= 0) ? v : 0;
+            }
+            if (auto* item = costTable_->item(i, j)) {
+                bool ok;
+                int v = item->text().toInt(&ok);
+                costMatrix_[i][j] = (ok && v >= 0) ? v : 0;
+            }
+        }
+    }
 
     // If max flow hasn't been computed yet, compute it now
     if (lastMaxFlow_ == 0) {

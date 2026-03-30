@@ -16,7 +16,8 @@
     None: 0,
     Route: 1,
     BiComp: 2,
-    DijkstraPath: 3
+    DijkstraPath: 3,
+    FlowPath: 4
   };
 
   class GraphCanvas {
@@ -33,6 +34,8 @@
       this.highlightedEdges = new Set();
       this.articulationPoints = [];
       this.blocks = [];
+      this.edgeLabels = null;
+      this.flowLabels = null;
       this.setupResize();
       this.draw();
     }
@@ -49,6 +52,8 @@
       this.highlightedEdges = new Set();
       this.articulationPoints = [];
       this.blocks = [];
+      this.edgeLabels = null;
+      this.flowLabels = null;
       this.computeLayout();
       this.draw();
     }
@@ -88,6 +93,47 @@
       for (let i = 0; i + 1 < path.length; i++) {
         this.highlightedEdges.add(path[i] + ',' + path[i + 1]);
       }
+      this.draw();
+    }
+
+    highlightFlowPath(path, isBackwardArray) {
+      this.mode = HighlightMode.FlowPath;
+      this.highlightedVertices = new Set(path);
+      this.highlightedEdges = new Set();
+      for (let i = 0; i + 1 < path.length; i++) {
+        if (isBackwardArray[i]) {
+          // Backward edge: the original edge is path[i+1]→path[i]
+          this.highlightedEdges.add(path[i + 1] + ',' + path[i]);
+        } else {
+          this.highlightedEdges.add(path[i] + ',' + path[i + 1]);
+        }
+      }
+      this.draw();
+    }
+
+    setEdgeLabels(labels) {
+      this.edgeLabels = labels;
+      this.draw();
+    }
+
+    clearEdgeLabels() {
+      this.edgeLabels = null;
+      this.draw();
+    }
+
+    setFlowLabels(flowMatrix, capacityMatrix, sink) {
+      const n = flowMatrix.length;
+      this.flowLabels = Array.from({ length: n }, function () { return new Array(n).fill(null); });
+      for (let u = 0; u < n; u++) {
+        if (flowMatrix[u][sink] > 0) {
+          this.flowLabels[u][sink] = flowMatrix[u][sink] + '/' + capacityMatrix[u][sink];
+        }
+      }
+      this.draw();
+    }
+
+    clearFlowLabels() {
+      this.flowLabels = null;
       this.draw();
     }
 
@@ -185,6 +231,9 @@
           } else if (this.mode === HighlightMode.DijkstraPath && this.highlightedEdges.has(edgeKey)) {
             color = '#FFB43C';
             width = 3;
+          } else if (this.mode === HighlightMode.FlowPath && this.highlightedEdges.has(edgeKey)) {
+            color = '#FF4444';
+            width = 3;
           } else if (this.mode === HighlightMode.BiComp && edgeBlockMap.has(edgeKey)) {
             const bi = edgeBlockMap.get(edgeKey);
             color = BLOCK_COLORS[bi % BLOCK_COLORS.length];
@@ -217,12 +266,18 @@
               this.drawArrowCurved(ctx, x1, y1, mx, my, x2, y2, vr, color);
             }
 
-            // Weight label
-            if (this.weights && this.n <= 20) {
+            // Weight / capacity / flow label
+            if (this.n <= 20) {
               const t = 0.5;
               const lx = (1 - t) * (1 - t) * x1 + 2 * (1 - t) * t * mx + t * t * x2;
               const ly = (1 - t) * (1 - t) * y1 + 2 * (1 - t) * t * my + t * t * y2;
-              this.drawWeightLabel(ctx, lx, ly, this.weights[i][j]);
+              if (this.flowLabels && this.flowLabels[i][j]) {
+                this.drawWeightLabel(ctx, lx, ly, this.flowLabels[i][j]);
+              } else if (this.edgeLabels) {
+                this.drawWeightLabel(ctx, lx, ly, this.edgeLabels[i][j]);
+              } else if (this.weights) {
+                this.drawWeightLabel(ctx, lx, ly, this.weights[i][j]);
+              }
             }
           } else {
             // Straight edge
@@ -235,11 +290,17 @@
               this.drawArrowStraight(ctx, x1, y1, x2, y2, vr, color);
             }
 
-            // Weight label
-            if (this.weights && this.n <= 20) {
+            // Weight / capacity / flow label
+            if (this.n <= 20) {
               const lx = (x1 + x2) / 2;
               const ly = (y1 + y2) / 2;
-              this.drawWeightLabel(ctx, lx, ly, this.weights[i][j]);
+              if (this.flowLabels && this.flowLabels[i][j]) {
+                this.drawWeightLabel(ctx, lx, ly, this.flowLabels[i][j]);
+              } else if (this.edgeLabels) {
+                this.drawWeightLabel(ctx, lx, ly, this.edgeLabels[i][j]);
+              } else if (this.weights) {
+                this.drawWeightLabel(ctx, lx, ly, this.weights[i][j]);
+              }
             }
           }
         }
@@ -254,6 +315,8 @@
           fill = 'rgb(255,100,100)';
         } else if (this.mode === HighlightMode.DijkstraPath && this.highlightedVertices.has(i)) {
           fill = 'rgb(255,180,60)';
+        } else if (this.mode === HighlightMode.FlowPath && this.highlightedVertices.has(i)) {
+          fill = 'rgb(255,100,100)';
         }
 
         ctx.beginPath();

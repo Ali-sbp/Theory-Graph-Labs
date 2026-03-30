@@ -8,6 +8,7 @@ struct MaxFlowResult {
     int iterations = 0;
     std::vector<std::vector<int>> augmentingPaths;
     std::vector<int> pathFlows;
+    std::vector<std::vector<bool>> pathEdgeTypes; // true = backward edge
 };
 
 class MaxFlow {
