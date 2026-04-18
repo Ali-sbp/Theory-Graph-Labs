@@ -939,7 +939,7 @@
     UIHelpers.displayMatrix('lab4VCMatrix', adj, 0, 'adjacency');
     UIHelpers.highlightCells('lab4VCMatrix', res.cover, 'cell-highlight-purple');
 
-    if (graphCanvas) graphCanvas.highlightVertexCover(res.cover);
+    if (graphCanvas) graphCanvas.highlightVertexCover(res.cover, res.pickedEdges, res.removedEdges);
   }
 
   // ---- Init ----

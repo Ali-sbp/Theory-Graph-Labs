@@ -110,10 +110,12 @@
       this.draw();
     }
 
-    highlightVertexCover(cover) {
+    highlightVertexCover(cover, pickedEdges, removedEdges) {
       this.mode = HighlightMode.VertexCover;
       this.highlightedVertices = new Set(cover);
       this.highlightedEdges = new Set();
+      this.vcPickedEdges = new Set((pickedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
+      this.vcRemovedEdges = new Set((removedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
       this.articulationPoints = [];
       this.blocks = [];
       this.draw();
@@ -252,6 +254,7 @@
           // Determine style
           let color = '#8888aa';
           let width = 1.5;
+          let dash = [];
           if (this.mode === HighlightMode.Route && this.highlightedEdges.has(edgeKey)) {
             color = '#64DC64';
             width = 3;
@@ -274,6 +277,16 @@
               color = '#444460';
               width = 1;
             }
+          } else if (this.mode === HighlightMode.VertexCover) {
+            const normKey = Math.min(i, j) + ',' + Math.max(i, j);
+            if (this.vcPickedEdges && this.vcPickedEdges.has(normKey)) {
+              color = 'rgb(170,100,220)';
+              width = 3;
+            } else if (this.vcRemovedEdges && this.vcRemovedEdges.has(normKey)) {
+              color = '#FFD700';
+              width = 1.5;
+              dash = [6, 4];
+            }
           }
 
           ctx.strokeStyle = color;
@@ -293,10 +306,12 @@
             const mx = (x1 + x2) / 2 + nx * off;
             const my = (y1 + y2) / 2 + ny * off;
 
+            ctx.setLineDash(dash);
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.quadraticCurveTo(mx, my, x2, y2);
             ctx.stroke();
+            ctx.setLineDash([]);
 
             if (this.directed && !this.forceUndirectedView) {
               this.drawArrowCurved(ctx, x1, y1, mx, my, x2, y2, vr, color);
@@ -317,10 +332,12 @@
             }
           } else {
             // Straight edge
+            ctx.setLineDash(dash);
             ctx.beginPath();
             ctx.moveTo(x1, y1);
             ctx.lineTo(x2, y2);
             ctx.stroke();
+            ctx.setLineDash([]);
 
             if (this.directed && !this.forceUndirectedView) {
               this.drawArrowStraight(ctx, x1, y1, x2, y2, vr, color);
