@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Поток</title>
+  <title>Теория графов</title>
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -19,6 +19,7 @@
         <button class="tab-btn" data-tab="4">Дейкстра (отр. веса)</button>
         <button class="tab-btn" data-tab="5">Сравнение алгоритмов</button>
         <button class="tab-btn" data-tab="6">Поток</button>
+        <button class="tab-btn" data-tab="7">Лаб 4</button>
       </nav>
 
       <div id="tab-panels">
@@ -222,6 +223,38 @@
           <div class="matrix-label">Матрица потока (мин. стоимость)</div>
           <div id="minCostFlowMatrix"></div>
 
+        </div><!-- /panel-6 -->
+
+        <!-- ======== Tab 7: Лаб 4 ======== -->
+        <div class="tab-panel" id="panel-7">
+
+          <!-- Задание 1 -->
+          <h3 class="section-heading">Задание 1: Число остовных деревьев (теорема Кирхгофа)</h3>
+          <div class="btn-row">
+            <button class="btn" id="lab4CountTreesBtn">Посчитать число остовных деревьев</button>
+          </div>
+          <div id="lab4Task1Text" class="text-output"></div>
+          <div class="matrix-label">Матрица Кирхгофа</div>
+          <div id="lab4LaplacianMatrix"></div>
+
+          <!-- Задание 2-c -->
+          <h3 class="section-heading">Задание 2-c: МОД (алгоритм Прима) + код Прюфера</h3>
+          <div class="btn-row">
+            <button class="btn" id="lab4BuildMSTBtn">Построить МОД и закодировать</button>
+          </div>
+          <div id="lab4Task2Text" class="text-output"></div>
+          <div class="matrix-label">Матрица весов (рёбра МОД выделены зелёным)</div>
+          <div id="lab4MSTMatrix"></div>
+
+          <!-- Задание 3-f -->
+          <h3 class="section-heading">Задание 3-f: Минимальное вершинное покрытие (2-приближение)</h3>
+          <div class="btn-row">
+            <button class="btn" id="lab4VertexCoverBtn">Найти минимальное вершинное покрытие</button>
+          </div>
+          <div id="lab4Task3Text" class="text-output"></div>
+          <div class="matrix-label">Матрица смежности (вершины покрытия выделены)</div>
+          <div id="lab4VCMatrix"></div>
+
         </div>
 
       </div><!-- /tab-panels -->
@@ -243,6 +276,9 @@
   <script src="js/bellmanford.js"></script>
   <script src="js/maxflow.js"></script>
   <script src="js/mincostflow.js"></script>
+  <script src="js/spanningtreecount.js"></script>
+  <script src="js/mstprim.js"></script>
+  <script src="js/vertexcover.js"></script>
   <script src="js/graph-canvas.js"></script>
   <script src="js/ui-helpers.js"></script>
   <script src="js/app.js"></script>

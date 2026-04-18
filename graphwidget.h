@@ -15,7 +15,9 @@ public:
         None,           // Tabs 1, 2, 6 — just draw the graph
         Route,          // Tab 3 — highlight path vertices + edges
         BiComp,         // Tab 4 — articulation points + colored blocks
-        DijkstraPath    // Tab 5 — highlight shortest path
+        DijkstraPath,   // Tab 5 — highlight shortest path
+        MSTEdges,       // Lab 4 Task 2c — bold green MST edges, faded non-MST
+        VertexCover     // Lab 4 Task 3f — highlighted cover vertices
     };
 
     explicit GraphWidget(QWidget* parent = nullptr);
@@ -27,6 +29,8 @@ public:
     void highlightBiComp(const std::set<int>& articulationPoints,
                          const std::vector<std::vector<std::pair<int,int>>>& blocks);
     void highlightDijkstraPath(const std::vector<int>& path);
+    void highlightMSTEdges(const std::set<std::pair<int,int>>& mstEdges);
+    void highlightVertexCover(const std::vector<int>& cover);
 
     QSize minimumSizeHint() const override;
     QSize sizeHint() const override;
@@ -65,5 +69,6 @@ private:
     static const QColor& routeVertexColor();
     static const QColor& articulationColor();
     static const QColor& dijkstraVertexColor();
+    static const QColor& vertexCoverColor();
     static const std::vector<QColor>& blockColors();
 };

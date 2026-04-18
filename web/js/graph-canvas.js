@@ -17,7 +17,9 @@
     Route: 1,
     BiComp: 2,
     DijkstraPath: 3,
-    FlowPath: 4
+    FlowPath: 4,
+    MSTEdges: 5,
+    VertexCover: 6
   };
 
   class GraphCanvas {
@@ -36,6 +38,7 @@
       this.blocks = [];
       this.edgeLabels = null;
       this.flowLabels = null;
+      this.forceUndirectedView = false;
       this.setupResize();
       this.draw();
     }
@@ -57,6 +60,8 @@
       this.computeLayout();
       this.draw();
     }
+
+    setForceUndirectedView(v) { this.forceUndirectedView = v; this.draw(); }
 
     clearHighlights() {
       this.mode = HighlightMode.None;
@@ -93,6 +98,24 @@
       for (let i = 0; i + 1 < path.length; i++) {
         this.highlightedEdges.add(path[i] + ',' + path[i + 1]);
       }
+      this.draw();
+    }
+
+    highlightMSTEdges(mstEdgeSet) {
+      this.mode = HighlightMode.MSTEdges;
+      this.highlightedEdges = mstEdgeSet; // Set of 'u,v' strings (u < v)
+      this.highlightedVertices = new Set();
+      this.articulationPoints = [];
+      this.blocks = [];
+      this.draw();
+    }
+
+    highlightVertexCover(cover) {
+      this.mode = HighlightMode.VertexCover;
+      this.highlightedVertices = new Set(cover);
+      this.highlightedEdges = new Set();
+      this.articulationPoints = [];
+      this.blocks = [];
       this.draw();
     }
 
@@ -213,14 +236,18 @@
       }
 
       // ---- Draw edges ----
+      const treatAsUndirected = !this.directed || this.forceUndirectedView;
       for (let i = 0; i < this.n; i++) {
         for (let j = 0; j < this.n; j++) {
-          if (!this.adj[i][j]) continue;
-          // For undirected, draw each edge once
-          if (!this.directed && j <= i) continue;
+          if (treatAsUndirected) {
+            if (j <= i) continue;
+            if (!this.adj[i][j] && !this.adj[j][i]) continue;
+          } else {
+            if (!this.adj[i][j]) continue;
+          }
 
           const edgeKey = i + ',' + j;
-          const bidirectional = this.directed && this.adj[i][j] && this.adj[j][i];
+          const bidirectional = this.directed && !this.forceUndirectedView && this.adj[i][j] && this.adj[j][i];
 
           // Determine style
           let color = '#8888aa';
@@ -238,6 +265,15 @@
             const bi = edgeBlockMap.get(edgeKey);
             color = BLOCK_COLORS[bi % BLOCK_COLORS.length];
             width = 2.5;
+          } else if (this.mode === HighlightMode.MSTEdges) {
+            const normKey = Math.min(i, j) + ',' + Math.max(i, j);
+            if (this.highlightedEdges.has(normKey)) {
+              color = '#64DC64';
+              width = 3;
+            } else {
+              color = '#444460';
+              width = 1;
+            }
           }
 
           ctx.strokeStyle = color;
@@ -262,7 +298,7 @@
             ctx.quadraticCurveTo(mx, my, x2, y2);
             ctx.stroke();
 
-            if (this.directed) {
+            if (this.directed && !this.forceUndirectedView) {
               this.drawArrowCurved(ctx, x1, y1, mx, my, x2, y2, vr, color);
             }
 
@@ -286,7 +322,7 @@
             ctx.lineTo(x2, y2);
             ctx.stroke();
 
-            if (this.directed) {
+            if (this.directed && !this.forceUndirectedView) {
               this.drawArrowStraight(ctx, x1, y1, x2, y2, vr, color);
             }
 
@@ -299,7 +335,7 @@
               } else if (this.edgeLabels) {
                 this.drawWeightLabel(ctx, lx, ly, this.edgeLabels[i][j]);
               } else if (this.weights) {
-                this.drawWeightLabel(ctx, lx, ly, this.weights[i][j]);
+                this.drawWeightLabel(ctx, lx, ly, this.weights[i][j] || this.weights[j][i]);
               }
             }
           }
@@ -317,6 +353,8 @@
           fill = 'rgb(255,180,60)';
         } else if (this.mode === HighlightMode.FlowPath && this.highlightedVertices.has(i)) {
           fill = 'rgb(255,100,100)';
+        } else if (this.mode === HighlightMode.VertexCover && this.highlightedVertices.has(i)) {
+          fill = 'rgb(170,100,220)';
         }
 
         ctx.beginPath();

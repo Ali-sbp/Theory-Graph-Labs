@@ -2,6 +2,8 @@
 
 #include <QMainWindow>
 #include "graphgenerator.h"
+#include <set>
+#include <utility>
 
 class GraphWidget;
 
@@ -40,6 +42,9 @@ private slots:
     void onGenerateFlowNetwork();
     void onFindMaxFlow();
     void onFindMinCostFlow();
+    void onLab4CountTrees();
+    void onLab4BuildMST();
+    void onLab4MinVertexCover();
 
 private:
     void setupTab1(QWidget* tab);
@@ -49,6 +54,7 @@ private:
     void setupTab5(QWidget* tab);
     void setupTab6(QWidget* tab);
     void setupTab7(QWidget* tab);
+    void setupTab8(QWidget* tab);
 
     enum class MatrixMode { Default, Adjacency, Weighted };
 
@@ -123,6 +129,14 @@ private:
     // Task 3
     QTextEdit*    minCostFlowText_;
     QTableWidget* minCostFlowTable_;
+
+    // ---- Tab 8 widgets (Лаб 4) ----
+    QTextEdit*    lab4Task1Text_;
+    QTableWidget* lab4Task1Table_;   // Laplacian
+    QTextEdit*    lab4Task2Text_;
+    QTableWidget* lab4Task2Table_;   // Weight matrix with MST edges highlighted
+    QTextEdit*    lab4Task3Text_;
+    QTableWidget* lab4Task3Table_;   // Adj matrix with cover vertices highlighted
 
     // ---- Graph visualization ----
     QTabWidget*  tabs_;

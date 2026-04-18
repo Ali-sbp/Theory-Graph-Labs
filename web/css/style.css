@@ -277,6 +277,11 @@ body {
   color: #C8DCFF !important;
 }
 
+.cell-highlight-purple {
+  background: #4a2e6b !important;
+  color: #DCC8FF !important;
+}
+
 .btn-sm {
   padding: 5px 12px;
   font-size: 0.8rem;

@@ -35,6 +35,12 @@ const QColor& GraphWidget::dijkstraVertexColor()
     return c;
 }
 
+const QColor& GraphWidget::vertexCoverColor()
+{
+    static QColor c(170, 100, 220);  // medium purple
+    return c;
+}
+
 const std::vector<QColor>& GraphWidget::blockColors()
 {
     static std::vector<QColor> colors = {
@@ -124,6 +130,28 @@ void GraphWidget::highlightDijkstraPath(const std::vector<int>& path)
         highlightedVertices_.insert(v);
     for (size_t i = 0; i + 1 < path.size(); ++i)
         highlightedEdges_.insert({path[i], path[i + 1]});
+    update();
+}
+
+void GraphWidget::highlightMSTEdges(const std::set<std::pair<int,int>>& mstEdges)
+{
+    mode_ = HighlightMode::MSTEdges;
+    highlightedEdges_ = mstEdges;
+    highlightedVertices_.clear();
+    highlightedPath_.clear();
+    articulationPoints_.clear();
+    blocks_.clear();
+    update();
+}
+
+void GraphWidget::highlightVertexCover(const std::vector<int>& cover)
+{
+    mode_ = HighlightMode::VertexCover;
+    highlightedVertices_ = std::set<int>(cover.begin(), cover.end());
+    highlightedEdges_.clear();
+    highlightedPath_.clear();
+    articulationPoints_.clear();
+    blocks_.clear();
     update();
 }
 
@@ -338,6 +366,9 @@ void GraphWidget::paintEvent(QPaintEvent* /*event*/)
     QPen routeEdgePen(routeVertexColor(), 3.0);
     QPen dijkstraEdgePen(dijkstraVertexColor(), 3.0);
 
+    QPen fadedEdgePen(QColor(200, 200, 210), 1.0);
+    QPen mstEdgePen(routeVertexColor(), 3.0);
+
     auto drawEdgesForPair = [&](int i, int j) {
         if (!adj_[i][j]) return;
 
@@ -360,6 +391,9 @@ void GraphWidget::paintEvent(QPaintEvent* /*event*/)
             } else {
                 drawEdge(p, i, j, defaultEdgePen);
             }
+        } else if (mode_ == HighlightMode::MSTEdges) {
+            auto key = std::make_pair(std::min(i, j), std::max(i, j));
+            drawEdge(p, i, j, highlightedEdges_.count(key) ? mstEdgePen : fadedEdgePen);
         } else {
             drawEdge(p, i, j, defaultEdgePen);
         }
@@ -389,6 +423,10 @@ void GraphWidget::paintEvent(QPaintEvent* /*event*/)
             break;
         case HighlightMode::DijkstraPath:
             fill = highlightedVertices_.count(v) ? QBrush(dijkstraVertexColor())
+                                                  : QBrush(defaultVertexColor());
+            break;
+        case HighlightMode::VertexCover:
+            fill = highlightedVertices_.count(v) ? QBrush(vertexCoverColor())
                                                   : QBrush(defaultVertexColor());
             break;
         default:

@@ -25,6 +25,9 @@ set(SOURCES
     bellmanford.cpp
     maxflow.cpp
     mincostflow.cpp
+    spanningtreecount.cpp
+    mstprim.cpp
+    vertexcover.cpp
 )
 
 set(HEADERS
@@ -40,6 +43,9 @@ set(HEADERS
     bellmanford.h
     maxflow.h
     mincostflow.h
+    spanningtreecount.h
+    mstprim.h
+    vertexcover.h
 )
 
 add_executable(${PROJECT_NAME} ${SOURCES} ${HEADERS})

@@ -8,6 +8,9 @@
 #include "bellmanford.h"
 #include "maxflow.h"
 #include "mincostflow.h"
+#include "spanningtreecount.h"
+#include "mstprim.h"
+#include "vertexcover.h"
 
 #include <QCheckBox>
 #include <QDoubleSpinBox>
@@ -50,6 +53,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     auto* tab5 = new QWidget;
     auto* tab6 = new QWidget;
     auto* tab7 = new QWidget;
+    auto* tab8 = new QWidget;
 
     setupTab1(tab1);
     setupTab2(tab2);
@@ -58,6 +62,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     setupTab5(tab5);
     setupTab6(tab6);
     setupTab7(tab7);
+    setupTab8(tab8);
 
     tabs_->addTab(tab1, "Граф и Анализ");
     tabs_->addTab(tab2, "Метод Шимбелла");
@@ -66,6 +71,7 @@ MainWindow::MainWindow(QWidget* parent) : QMainWindow(parent)
     tabs_->addTab(tab5, "Дейкстра (отр. веса)");
     tabs_->addTab(tab6, "Сравнение алгоритмов");
     tabs_->addTab(tab7, "Поток");
+    tabs_->addTab(tab8, "Лаб 4");
 
     connect(tabs_, &QTabWidget::currentChanged, this, &MainWindow::onTabChanged);
 
@@ -1259,6 +1265,7 @@ void MainWindow::onTabChanged(int index)
     case 1:
     case 5:
     case 6:
+    case 7:
         graphWidget_->clearHighlights();
         break;
     default:
@@ -1565,4 +1572,236 @@ void MainWindow::onFindMinCostFlow()
 
     minCostFlowText_->setText(text);
     displayMatrix(minCostFlowTable_, result.flowMatrix);
+}
+
+// -----------------------------------------------------------------------
+//  Tab 8 — Лаб 4 (Spanning tree count, MST+Prüfer, Min Vertex Cover)
+// -----------------------------------------------------------------------
+void MainWindow::setupTab8(QWidget* tab)
+{
+    auto* layout = new QVBoxLayout(tab);
+
+    // ===== ЗАДАНИЕ 1: Число остовных деревьев =====
+    auto* task1 = new QGroupBox("Задание 1: Число остовных деревьев (теорема Кирхгофа)");
+    auto* task1Layout = new QVBoxLayout(task1);
+
+    auto* countBtn = new QPushButton("Посчитать число остовных деревьев");
+    connect(countBtn, &QPushButton::clicked, this, &MainWindow::onLab4CountTrees);
+    task1Layout->addWidget(countBtn);
+
+    lab4Task1Text_ = new QTextEdit;
+    lab4Task1Text_->setReadOnly(true);
+    lab4Task1Text_->setMaximumHeight(80);
+    task1Layout->addWidget(lab4Task1Text_);
+
+    task1Layout->addWidget(new QLabel("Матрица Кирхгофа"));
+    lab4Task1Table_ = new QTableWidget;
+    task1Layout->addWidget(lab4Task1Table_, 1);
+
+    layout->addWidget(task1, 2);
+
+    // ===== ЗАДАНИЕ 2-c: МОД через Прима + код Прюфера =====
+    auto* task2 = new QGroupBox("Задание 2-c: МОД (алгоритм Прима) + код Прюфера");
+    auto* task2Layout = new QVBoxLayout(task2);
+
+    auto* mstBtn = new QPushButton("Построить МОД и закодировать");
+    connect(mstBtn, &QPushButton::clicked, this, &MainWindow::onLab4BuildMST);
+    task2Layout->addWidget(mstBtn);
+
+    lab4Task2Text_ = new QTextEdit;
+    lab4Task2Text_->setReadOnly(true);
+    lab4Task2Text_->setMaximumHeight(120);
+    task2Layout->addWidget(lab4Task2Text_);
+
+    task2Layout->addWidget(new QLabel("Матрица весов (рёбра МОД выделены зелёным)"));
+    lab4Task2Table_ = new QTableWidget;
+    task2Layout->addWidget(lab4Task2Table_, 1);
+
+    layout->addWidget(task2, 2);
+
+    // ===== ЗАДАНИЕ 3-f: Минимальное вершинное покрытие =====
+    auto* task3 = new QGroupBox("Задание 3-f: Минимальное вершинное покрытие (2-приближение)");
+    auto* task3Layout = new QVBoxLayout(task3);
+
+    auto* vcBtn = new QPushButton("Найти минимальное вершинное покрытие");
+    connect(vcBtn, &QPushButton::clicked, this, &MainWindow::onLab4MinVertexCover);
+    task3Layout->addWidget(vcBtn);
+
+    lab4Task3Text_ = new QTextEdit;
+    lab4Task3Text_->setReadOnly(true);
+    lab4Task3Text_->setMaximumHeight(100);
+    task3Layout->addWidget(lab4Task3Text_);
+
+    task3Layout->addWidget(new QLabel("Матрица смежности (вершины покрытия выделены)"));
+    lab4Task3Table_ = new QTableWidget;
+    task3Layout->addWidget(lab4Task3Table_, 1);
+
+    layout->addWidget(task3, 2);
+}
+
+// Helper: symmetrize adj + weight matrices in-place
+static void symmetrize(std::vector<std::vector<int>>& adj,
+                        std::vector<std::vector<int>>& w)
+{
+    const int n = static_cast<int>(adj.size());
+    for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j) {
+            if (adj[i][j] || adj[j][i]) {
+                adj[i][j] = adj[j][i] = 1;
+                int wv = (w[i][j] != 0) ? w[i][j] : w[j][i];
+                w[i][j] = w[j][i] = wv;
+            }
+        }
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Count spanning trees (Task 1)
+// -----------------------------------------------------------------------
+void MainWindow::onLab4CountTrees()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    auto adj = graph_.adjMatrix;
+    auto w   = graph_.weightMatrix;
+    if (graph_.directed) symmetrize(adj, w);
+
+    const int n = graph_.n;
+
+    // Count undirected edges to detect tree
+    int edgeCount = 0;
+    for (int i = 0; i < n; ++i)
+        for (int j = i + 1; j < n; ++j)
+            if (adj[i][j]) ++edgeCount;
+
+    auto res = SpanningTreeCount::solve(adj);
+
+    QString text;
+    if (graph_.directed)
+        text += "Граф рассматривается как неориентированный.\n";
+    text += QString("Число остовных деревьев: %1\n").arg(res.count);
+
+    lab4Task1Text_->setText(text);
+    displayMatrix(lab4Task1Table_, res.laplacian);
+    graphWidget_->clearHighlights();
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Build MST + Prüfer code (Task 2c)
+// -----------------------------------------------------------------------
+void MainWindow::onLab4BuildMST()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    auto adj = graph_.adjMatrix;
+    auto w   = graph_.weightMatrix;
+    if (graph_.directed) symmetrize(adj, w);
+
+    auto res = MSTPrim::solve(adj, w);
+
+    QString text;
+    if (graph_.directed)
+        text += "Граф рассматривается как неориентированный.\n";
+
+    if (!res.connected) {
+        text += "Граф несвязный — МОД не существует.\n";
+        lab4Task2Text_->setText(text);
+        return;
+    }
+
+    text += QString("Суммарный вес МОД: %1\n").arg(res.totalWeight);
+
+    // MST edges
+    text += "Рёбра МОД: ";
+    for (int k = 0; k < (int)res.edges.size(); ++k) {
+        if (k) text += ", ";
+        text += QString("(%1, %2, w=%3)")
+                    .arg(res.edges[k].first)
+                    .arg(res.edges[k].second)
+                    .arg(res.weights[k]);
+    }
+    text += "\n";
+
+    // Prüfer code
+    if (graph_.n <= 2) {
+        text += "Код Прюфера: [] (граф из 2 вершин)\n";
+    } else {
+        text += "Код Прюфера A = [";
+        for (int k = 0; k < (int)res.pruferCode.size(); ++k) {
+            if (k) text += ", ";
+            text += QString::number(res.pruferCode[k]);
+        }
+        text += "]\n";
+    }
+    text += "Веса рёбер W = [";
+    for (int k = 0; k < (int)res.pruferWeights.size(); ++k) {
+        if (k) text += ", ";
+        text += QString::number(res.pruferWeights[k]);
+    }
+    text += "]\n";
+    text += QString("Обратное декодирование: %1").arg(res.roundTripOk ? "ОК ✓" : "ОШИБКА ✗");
+
+    lab4Task2Text_->setText(text);
+
+    // Display weight matrix; highlight MST edges
+    displayMatrix(lab4Task2Table_, w, 0, MatrixMode::Weighted);
+    std::vector<std::pair<int,int>> mstEdgePairs;
+    for (auto& [u, v] : res.edges) {
+        mstEdgePairs.push_back({u, v});
+        mstEdgePairs.push_back({v, u});
+    }
+    highlightPath(lab4Task2Table_, mstEdgePairs);
+
+    // Canvas highlight
+    std::set<std::pair<int,int>> mstSet;
+    for (auto& [u, v] : res.edges)
+        mstSet.insert({std::min(u,v), std::max(u,v)});
+    graphWidget_->highlightMSTEdges(mstSet);
+}
+
+// -----------------------------------------------------------------------
+//  Slot: Min vertex cover (Task 3f)
+// -----------------------------------------------------------------------
+void MainWindow::onLab4MinVertexCover()
+{
+    if (!hasGraph_) {
+        QMessageBox::warning(this, "Внимание", "Сначала сгенерируйте граф!");
+        return;
+    }
+
+    auto adj = graph_.adjMatrix;
+    auto w   = graph_.weightMatrix;
+    if (graph_.directed) symmetrize(adj, w);
+
+    auto res = VertexCover::solve(adj);
+
+    QString text;
+    if (graph_.directed)
+        text += "Граф рассматривается как неориентированный.\n";
+
+    text += "S = { ";
+    for (int k = 0; k < (int)res.cover.size(); ++k) {
+        if (k) text += ", ";
+        text += QString::number(res.cover[k]);
+    }
+    text += " }\n";
+    text += QString("|S| = %1  (|S| ≤ 2|T|)\n").arg(res.cover.size());
+
+    text += "Выбранные рёбра: ";
+    for (int k = 0; k < (int)res.pickedEdges.size(); ++k) {
+        if (k) text += ", ";
+        text += QString("(%1, %2)").arg(res.pickedEdges[k].first).arg(res.pickedEdges[k].second);
+    }
+
+    lab4Task3Text_->setText(text);
+
+    displayMatrix(lab4Task3Table_, adj, 0, MatrixMode::Adjacency);
+    highlightCells(lab4Task3Table_, res.cover, QColor(200, 150, 240));
+
+    graphWidget_->highlightVertexCover(res.cover);
 }

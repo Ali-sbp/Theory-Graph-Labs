@@ -49,8 +49,12 @@
         document.getElementById('panel-' + tab).classList.add('active');
 
         // Clear highlights on plain-graph tabs (matching onTabChanged)
-        if (tab === 0 || tab === 1 || tab === 5 || tab === 6) {
+        if (graphCanvas) graphCanvas.setForceUndirectedView(false);
+        if (tab === 0 || tab === 1 || tab === 5 || tab === 6 || tab === 7) {
           if (graphCanvas) graphCanvas.clearHighlights();
+        }
+        if (tab === 7) {
+          if (graphCanvas) graphCanvas.setForceUndirectedView(true);
         }
 
         // Swap edge labels for flow tab
@@ -107,6 +111,14 @@
     $('minCostFlowMatrix').innerHTML = '';
     hasFlowNetwork = false;
     lastMaxFlow = 0;
+
+    // Clear Tab 7 (Лаб 4)
+    $('lab4Task1Text').textContent = '';
+    $('lab4LaplacianMatrix').innerHTML = '';
+    $('lab4Task2Text').textContent = '';
+    $('lab4MSTMatrix').innerHTML = '';
+    $('lab4Task3Text').textContent = '';
+    $('lab4VCMatrix').innerHTML = '';
 
     // Display matrices
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
@@ -200,6 +212,14 @@
     $('minCostFlowMatrix').innerHTML = '';
     hasFlowNetwork = false;
     lastMaxFlow = 0;
+
+    // Clear Tab 7 (Лаб 4)
+    $('lab4Task1Text').textContent = '';
+    $('lab4LaplacianMatrix').innerHTML = '';
+    $('lab4Task2Text').textContent = '';
+    $('lab4MSTMatrix').innerHTML = '';
+    $('lab4Task3Text').textContent = '';
+    $('lab4VCMatrix').innerHTML = '';
 
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
     UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
@@ -812,6 +832,116 @@
     }
   }
 
+  // ---- Helpers for Lab 4 ----
+  function symmetrizeAdj(adj) {
+    const n = adj.length;
+    const a = adj.map(r => r.slice());
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++)
+        if (a[i][j] || a[j][i]) a[i][j] = a[j][i] = 1;
+    return a;
+  }
+  function symmetrizeWeight(adj, w) {
+    const n = adj.length;
+    const a = symmetrizeAdj(adj);
+    const ww = w.map(r => r.slice());
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++) {
+        if (a[i][j]) {
+          const v = ww[i][j] !== 0 ? ww[i][j] : ww[j][i];
+          ww[i][j] = ww[j][i] = v;
+        }
+      }
+    return [a, ww];
+  }
+
+  // ---- Tab 7: Lab 4 ----
+
+  function onLab4CountTrees() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    const n = graph.n;
+    const adj = graph.directed ? symmetrizeAdj(graph.adjMatrix) : graph.adjMatrix.map(r => r.slice());
+
+    // Count undirected edges
+    let edgeCount = 0;
+    for (let i = 0; i < n; i++)
+      for (let j = i + 1; j < n; j++)
+        if (adj[i][j]) edgeCount++;
+
+    const res = SpanningTreeCount.solve(adj);
+
+    let text = '';
+    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+    text += 'Число остовных деревьев: ' + res.count + '\n';
+
+    $('lab4Task1Text').textContent = text;
+    UIHelpers.displayMatrix('lab4LaplacianMatrix', res.laplacian);
+    if (graphCanvas) graphCanvas.clearHighlights();
+  }
+
+  function onLab4BuildMST() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    const [adj, w] = symmetrizeWeight(graph.adjMatrix, graph.weightMatrix);
+
+    const res = MSTPrim.solve(adj, w);
+
+    let text = '';
+    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+
+    if (!res.connected) {
+      text += 'Граф несвязный — МОД не существует.\n';
+      $('lab4Task2Text').textContent = text;
+      return;
+    }
+
+    text += 'Суммарный вес МОД: ' + res.totalWeight + '\n';
+    text += 'Рёбра МОД: ' + res.edges.map((e, k) => '(' + e[0] + ', ' + e[1] + ', w=' + res.weights[k] + ')').join(', ') + '\n';
+
+    if (graph.n <= 2) {
+      text += 'Код Прюфера: [] (граф из 2 вершин)\n';
+    } else {
+      text += 'Код Прюфера A = [' + res.pruferCode.join(', ') + ']\n';
+    }
+    text += 'Веса рёбер W = [' + res.pruferWeights.join(', ') + ']\n';
+    text += 'Обратное декодирование: ' + (res.roundTripOk ? 'ОК ✓' : 'ОШИБКА ✗');
+
+    $('lab4Task2Text').textContent = text;
+
+    UIHelpers.displayMatrix('lab4MSTMatrix', w, 0, 'weighted');
+    // Highlight MST edges (both directions since undirected)
+    const mstEdgePairs = [];
+    for (const [u, v] of res.edges) {
+      mstEdgePairs.push([u, v]);
+      mstEdgePairs.push([v, u]);
+    }
+    UIHelpers.highlightPath('lab4MSTMatrix', mstEdgePairs);
+
+    if (graphCanvas) {
+      const mstSet = new Set(res.edges.map(([u, v]) => Math.min(u,v) + ',' + Math.max(u,v)));
+      graphCanvas.highlightMSTEdges(mstSet);
+    }
+  }
+
+  function onLab4VertexCover() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    const adj = symmetrizeAdj(graph.adjMatrix);
+
+    const res = VertexCover.solve(adj);
+
+    let text = '';
+    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+    text += 'S = { ' + res.cover.join(', ') + ' }\n';
+    text += '|S| = ' + res.cover.length + '  (|S| ≤ 2|T|)\n';
+    text += 'Выбранные рёбра: ' + res.pickedEdges.map(e => '(' + e[0] + ', ' + e[1] + ')').join(', ');
+
+    $('lab4Task3Text').textContent = text;
+
+    UIHelpers.displayMatrix('lab4VCMatrix', adj, 0, 'adjacency');
+    UIHelpers.highlightCells('lab4VCMatrix', res.cover, 'cell-highlight-purple');
+
+    if (graphCanvas) graphCanvas.highlightVertexCover(res.cover);
+  }
+
   // ---- Init ----
   document.addEventListener('DOMContentLoaded', function () {
     setupTabs();
@@ -833,6 +963,9 @@
     $('genFlowNetworkBtn').addEventListener('click', onGenerateFlowNetwork);
     $('maxFlowBtn').addEventListener('click', onFindMaxFlow);
     $('minCostFlowBtn').addEventListener('click', onFindMinCostFlow);
+    $('lab4CountTreesBtn').addEventListener('click', onLab4CountTrees);
+    $('lab4BuildMSTBtn').addEventListener('click', onLab4BuildMST);
+    $('lab4VertexCoverBtn').addEventListener('click', onLab4VertexCover);
   });
 
 })();
