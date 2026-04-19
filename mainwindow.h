@@ -137,6 +137,8 @@ private:
     QTableWidget* lab4Task2Table_;   // Weight matrix with MST edges highlighted
     QTextEdit*    lab4Task3Text_;
     QTableWidget* lab4Task3Table_;   // Adj matrix with cover vertices highlighted
+    QRadioButton* vcFullGraphRadio_;
+    QRadioButton* vcMSTRadio_;
 
     // ---- Graph visualization ----
     QTabWidget*  tabs_;
@@ -145,6 +147,8 @@ private:
     // ---- State ----
     GraphData graph_;
     bool      hasGraph_ = false;
+    std::vector<std::vector<int>> mstAdjMatrix_;
+    bool      hasMST_   = false;
 
     // ---- Original directed matrices (for directed/undirected rearrangement) ----
     std::vector<std::vector<int>> originalAdjMatrix_;

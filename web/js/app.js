@@ -13,6 +13,9 @@
   let originalAdjMatrix = null;
   let originalWeightMatrix = null;
 
+  // Lab 4 state (Tab 7)
+  let mstAdjMatrix = null;
+
   // Flow network state (Tab 6)
   let capacityMatrix = null;
   let costMatrix = null;
@@ -119,6 +122,9 @@
     $('lab4MSTMatrix').innerHTML = '';
     $('lab4Task3Text').textContent = '';
     $('lab4VCMatrix').innerHTML = '';
+    mstAdjMatrix = null;
+    $('vcSourceMstRadio').disabled = true;
+    document.querySelector('input[name="lab4VCSource"][value="full"]').checked = true;
 
     // Display matrices
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
@@ -220,6 +226,9 @@
     $('lab4MSTMatrix').innerHTML = '';
     $('lab4Task3Text').textContent = '';
     $('lab4VCMatrix').innerHTML = '';
+    mstAdjMatrix = null;
+    $('vcSourceMstRadio').disabled = true;
+    document.querySelector('input[name="lab4VCSource"][value="full"]').checked = true;
 
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
     UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
@@ -907,6 +916,14 @@
 
     $('lab4Task2Text').textContent = text;
 
+    // Save MST adjacency matrix for task 3f
+    const n = graph.n;
+    mstAdjMatrix = Array.from({length: n}, () => new Array(n).fill(0));
+    res.edges.forEach(([u, v], k) => {
+      mstAdjMatrix[u][v] = mstAdjMatrix[v][u] = res.weights[k];
+    });
+    $('vcSourceMstRadio').disabled = false;
+
     UIHelpers.displayMatrix('lab4MSTMatrix', w, 0, 'weighted');
     // Highlight MST edges (both directions since undirected)
     const mstEdgePairs = [];
@@ -924,12 +941,17 @@
 
   function onLab4VertexCover() {
     if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
-    const adj = symmetrizeAdj(graph.adjMatrix);
+
+    const usesMST = document.querySelector('input[name="lab4VCSource"]:checked').value === 'mst';
+    if (usesMST && !mstAdjMatrix) { alert('Сначала постройте МОД (Задание 2)!'); return; }
+    const adj = usesMST ? mstAdjMatrix : symmetrizeAdj(graph.adjMatrix);
 
     const res = VertexCover.solve(adj);
 
     let text = '';
-    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+    if (usesMST) text += 'Применяется к: МОД\n';
+    else if (graph.directed) text += 'Применяется к: исходный граф (рассматривается как неориентированный)\n';
+    else text += 'Применяется к: исходный граф\n';
     text += 'S = { ' + res.cover.join(', ') + ' }\n';
     text += '|S| = ' + res.cover.length + '  (|S| ≤ 2|T|)\n';
     text += 'Выбранные рёбра: ' + res.pickedEdges.map(e => '(' + e[0] + ', ' + e[1] + ')').join(', ');
@@ -939,7 +961,15 @@
     UIHelpers.displayMatrix('lab4VCMatrix', adj, 0, 'adjacency');
     UIHelpers.highlightCells('lab4VCMatrix', res.cover, 'cell-highlight-purple');
 
-    if (graphCanvas) graphCanvas.highlightVertexCover(res.cover, res.pickedEdges, res.removedEdges);
+    let mstEdgeSet = null;
+    if (usesMST) {
+      mstEdgeSet = new Set();
+      const n = mstAdjMatrix.length;
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++)
+          if (mstAdjMatrix[i][j]) mstEdgeSet.add(i + ',' + j);
+    }
+    if (graphCanvas) graphCanvas.highlightVertexCover(res.cover, res.pickedEdges, res.removedEdges, mstEdgeSet);
   }
 
   // ---- Init ----

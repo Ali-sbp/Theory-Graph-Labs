@@ -110,12 +110,13 @@
       this.draw();
     }
 
-    highlightVertexCover(cover, pickedEdges, removedEdges) {
+    highlightVertexCover(cover, pickedEdges, removedEdges, mstEdgeSet = null) {
       this.mode = HighlightMode.VertexCover;
       this.highlightedVertices = new Set(cover);
       this.highlightedEdges = new Set();
       this.vcPickedEdges = new Set((pickedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
       this.vcRemovedEdges = new Set((removedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
+      this.vcMSTEdges = mstEdgeSet;
       this.articulationPoints = [];
       this.blocks = [];
       this.draw();
@@ -283,9 +284,12 @@
               color = 'rgb(170,100,220)';
               width = 3;
             } else if (this.vcRemovedEdges && this.vcRemovedEdges.has(normKey)) {
-              color = '#FFD700';
+              color = this.vcMSTEdges ? '#64DC64' : '#FFD700';
               width = 1.5;
               dash = [6, 4];
+            } else if (this.vcMSTEdges && !this.vcMSTEdges.has(normKey)) {
+              color = '#444460';
+              width = 1;
             }
           }
 

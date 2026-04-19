@@ -339,6 +339,18 @@ void MainWindow::onGenerate()
     hasFlowNetwork_ = false;
     lastMaxFlow_ = 0;
 
+    // Clear Tab 8 (Лаб 4)
+    lab4Task1Text_->clear();
+    lab4Task1Table_->clear();    lab4Task1Table_->setRowCount(0);    lab4Task1Table_->setColumnCount(0);
+    lab4Task2Text_->clear();
+    lab4Task2Table_->clear();    lab4Task2Table_->setRowCount(0);    lab4Task2Table_->setColumnCount(0);
+    lab4Task3Text_->clear();
+    lab4Task3Table_->clear();    lab4Task3Table_->setRowCount(0);    lab4Task3Table_->setColumnCount(0);
+    mstAdjMatrix_.clear();
+    hasMST_ = false;
+    vcMSTRadio_->setEnabled(false);
+    vcFullGraphRadio_->setChecked(true);
+
     // Display matrices
     displayMatrix(adjTable_,    graph_.adjMatrix, 0, MatrixMode::Adjacency);
     displayMatrix(weightTable_, graph_.weightMatrix, 0, MatrixMode::Weighted);
@@ -465,6 +477,18 @@ void MainWindow::onGenerateDAG()
     minCostFlowTable_->clear(); minCostFlowTable_->setRowCount(0); minCostFlowTable_->setColumnCount(0);
     hasFlowNetwork_ = false;
     lastMaxFlow_ = 0;
+
+    // Clear Tab 8 (Лаб 4)
+    lab4Task1Text_->clear();
+    lab4Task1Table_->clear();    lab4Task1Table_->setRowCount(0);    lab4Task1Table_->setColumnCount(0);
+    lab4Task2Text_->clear();
+    lab4Task2Table_->clear();    lab4Task2Table_->setRowCount(0);    lab4Task2Table_->setColumnCount(0);
+    lab4Task3Text_->clear();
+    lab4Task3Table_->clear();    lab4Task3Table_->setRowCount(0);    lab4Task3Table_->setColumnCount(0);
+    mstAdjMatrix_.clear();
+    hasMST_ = false;
+    vcMSTRadio_->setEnabled(false);
+    vcFullGraphRadio_->setChecked(true);
 
     // Display matrices
     displayMatrix(adjTable_,    graph_.adjMatrix, 0, MatrixMode::Adjacency);
@@ -1623,6 +1647,17 @@ void MainWindow::setupTab8(QWidget* tab)
     auto* task3 = new QGroupBox("Задание 3-f: Минимальное вершинное покрытие (2-приближение)");
     auto* task3Layout = new QVBoxLayout(task3);
 
+    auto* sourceRow = new QHBoxLayout;
+    sourceRow->addWidget(new QLabel("Применить к:"));
+    vcFullGraphRadio_ = new QRadioButton("Исходный граф");
+    vcFullGraphRadio_->setChecked(true);
+    vcMSTRadio_ = new QRadioButton("МОД");
+    vcMSTRadio_->setEnabled(false);
+    sourceRow->addWidget(vcFullGraphRadio_);
+    sourceRow->addWidget(vcMSTRadio_);
+    sourceRow->addStretch();
+    task3Layout->addLayout(sourceRow);
+
     auto* vcBtn = new QPushButton("Найти минимальное вершинное покрытие");
     connect(vcBtn, &QPushButton::clicked, this, &MainWindow::onLab4MinVertexCover);
     task3Layout->addWidget(vcBtn);
@@ -1762,6 +1797,16 @@ void MainWindow::onLab4BuildMST()
     for (auto& [u, v] : res.edges)
         mstSet.insert({std::min(u,v), std::max(u,v)});
     graphWidget_->highlightMSTEdges(mstSet);
+
+    // Save MST adjacency matrix for task 3f
+    const int n = graph_.n;
+    mstAdjMatrix_.assign(n, std::vector<int>(n, 0));
+    for (int k = 0; k < (int)res.edges.size(); ++k) {
+        int u = res.edges[k].first, v = res.edges[k].second;
+        mstAdjMatrix_[u][v] = mstAdjMatrix_[v][u] = res.weights[k];
+    }
+    hasMST_ = true;
+    vcMSTRadio_->setEnabled(true);
 }
 
 // -----------------------------------------------------------------------
@@ -1774,15 +1819,30 @@ void MainWindow::onLab4MinVertexCover()
         return;
     }
 
-    auto adj = graph_.adjMatrix;
-    auto w   = graph_.weightMatrix;
-    if (graph_.directed) symmetrize(adj, w);
+    const bool usesMST = vcMSTRadio_->isChecked();
+    if (usesMST && !hasMST_) {
+        QMessageBox::warning(this, "Внимание", "Сначала постройте МОД (Задание 2)!");
+        return;
+    }
+
+    std::vector<std::vector<int>> adj;
+    if (usesMST) {
+        adj = mstAdjMatrix_;
+    } else {
+        adj = graph_.adjMatrix;
+        auto w = graph_.weightMatrix;
+        if (graph_.directed) symmetrize(adj, w);
+    }
 
     auto res = VertexCover::solve(adj);
 
     QString text;
-    if (graph_.directed)
-        text += "Граф рассматривается как неориентированный.\n";
+    if (usesMST)
+        text += "Применяется к: МОД\n";
+    else if (graph_.directed)
+        text += "Применяется к: исходный граф (рассматривается как неориентированный)\n";
+    else
+        text += "Применяется к: исходный граф\n";
 
     text += "S = { ";
     for (int k = 0; k < (int)res.cover.size(); ++k) {
