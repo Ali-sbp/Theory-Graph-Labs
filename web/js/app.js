@@ -869,6 +869,12 @@
   function onLab4CountTrees() {
     if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
     const n = graph.n;
+    if (n === 1) {
+      $('lab4Task1Text').textContent = 'Граф состоит из одной вершины — остовное дерево тривиально (нет рёбер).';
+      $('lab4LaplacianMatrix').innerHTML = '';
+      if (graphCanvas) graphCanvas.clearHighlights();
+      return;
+    }
     const adj = graph.directed ? symmetrizeAdj(graph.adjMatrix) : graph.adjMatrix.map(r => r.slice());
 
     // Count undirected edges
@@ -890,6 +896,12 @@
 
   function onLab4BuildMST() {
     if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    if (graph.n === 1) {
+      $('lab4Task2Text').textContent = 'Граф состоит из одной вершины — МОД не применим.';
+      $('lab4MSTMatrix').innerHTML = '';
+      if (graphCanvas) graphCanvas.clearHighlights();
+      return;
+    }
     const [adj, w] = symmetrizeWeight(graph.adjMatrix, graph.weightMatrix);
 
     const res = MSTPrim.solve(adj, w);
@@ -912,7 +924,9 @@
       text += 'Код Прюфера A = [' + res.pruferCode.join(', ') + ']\n';
     }
     text += 'Веса рёбер W = [' + res.pruferWeights.join(', ') + ']\n';
-    text += 'Обратное декодирование: ' + (res.roundTripOk ? 'ОК ✓' : 'ОШИБКА ✗');
+    text += '\nДекодирование кода Прюфера:\n';
+    text += 'Рёбра: ' + res.decodedEdges.map((e, k) => '(' + e[0] + ', ' + e[1] + ', w=' + res.decodedWeights[k] + ')').join(', ') + '\n';
+    text += 'Совпадает с МОД: ' + (res.roundTripOk ? 'ОК ✓' : 'ОШИБКА ✗');
 
     $('lab4Task2Text').textContent = text;
 
@@ -941,6 +955,12 @@
 
   function onLab4VertexCover() {
     if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    if (graph.n === 1) {
+      $('lab4Task3Text').textContent = 'Граф состоит из одной вершины — рёбер нет, покрытие пусто.';
+      $('lab4VCMatrix').innerHTML = '';
+      if (graphCanvas) graphCanvas.clearHighlights();
+      return;
+    }
 
     const usesMST = document.querySelector('input[name="lab4VCSource"]:checked').value === 'mst';
     if (usesMST && !mstAdjMatrix) { alert('Сначала постройте МОД (Задание 2)!'); return; }
@@ -954,7 +974,13 @@
     else text += 'Применяется к: исходный граф\n';
     text += 'S = { ' + res.cover.join(', ') + ' }\n';
     text += '|S| = ' + res.cover.length + '  (|S| ≤ 2|T|)\n';
-    text += 'Выбранные рёбра: ' + res.pickedEdges.map(e => '(' + e[0] + ', ' + e[1] + ')').join(', ');
+    text += '\nХод алгоритма:\n';
+    const totalRemoved = res.removedCountPerStep.reduce((s, x) => s + x, 0);
+    res.pickedEdges.forEach((e, i) => {
+      text += '  Итерация ' + (i + 1) + ': выбрано (' + e[0] + ', ' + e[1] + ') → удалено рёбер: ' + res.removedCountPerStep[i] + '\n';
+    });
+    text += 'Итого итераций: ' + res.pickedEdges.length + '  |  Всего удалено рёбер: ' + totalRemoved + '\n';
+    text += '\nВыбранные рёбра: ' + res.pickedEdges.map(e => '(' + e[0] + ', ' + e[1] + ')').join(', ');
 
     $('lab4Task3Text').textContent = text;
 

@@ -3,7 +3,7 @@
 window.VertexCover = {
     solve(adjIn) {
         const n = adjIn.length;
-        const result = { cover: [], pickedEdges: [], removedEdges: [] };
+        const result = { cover: [], pickedEdges: [], removedEdges: [], removedCountPerStep: [] };
         if (n <= 0) return result;
 
         // Working copy: symmetrize
@@ -36,6 +36,7 @@ window.VertexCover = {
                 if (work[v][k]) removedSet.add(Math.min(v, k) + ',' + Math.max(v, k));
             }
             removedSet.forEach(s => result.removedEdges.push(s.split(',').map(Number)));
+            result.removedCountPerStep.push(removedSet.size + 1); // +1 for the picked edge itself
 
             for (let k = 0; k < n; k++) {
                 work[u][k] = work[k][u] = 0;
