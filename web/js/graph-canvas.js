@@ -19,7 +19,8 @@
     DijkstraPath: 3,
     FlowPath: 4,
     MSTEdges: 5,
-    VertexCover: 6
+    VertexCover: 6,
+    EulerianCycle: 7
   };
 
   class GraphCanvas {
@@ -39,6 +40,8 @@
       this.edgeLabels = null;
       this.flowLabels = null;
       this.forceUndirectedView = false;
+      this.eulerianAddedEdges = new Set();
+      this.eulerianRemovedEdges = new Set();
       this.setupResize();
       this.draw();
     }
@@ -57,6 +60,8 @@
       this.blocks = [];
       this.edgeLabels = null;
       this.flowLabels = null;
+      this.eulerianAddedEdges = new Set();
+      this.eulerianRemovedEdges = new Set();
       this.computeLayout();
       this.draw();
     }
@@ -69,6 +74,8 @@
       this.highlightedEdges = new Set();
       this.articulationPoints = [];
       this.blocks = [];
+      this.eulerianAddedEdges = new Set();
+      this.eulerianRemovedEdges = new Set();
       this.draw();
     }
 
@@ -79,6 +86,21 @@
       for (let i = 0; i + 1 < path.length; i++) {
         this.highlightedEdges.add(path[i] + ',' + path[i + 1]);
       }
+      this.draw();
+    }
+
+    highlightEulerianCycle(path, addedEdges, removedEdges) {
+      this.mode = HighlightMode.EulerianCycle;
+      this.highlightedVertices = new Set(path || []);
+      this.highlightedEdges = new Set();
+      for (let i = 0; i + 1 < (path || []).length; i++) {
+        const a = path[i], b = path[i + 1];
+        this.highlightedEdges.add(Math.min(a, b) + ',' + Math.max(a, b));
+      }
+      this.eulerianAddedEdges = new Set((addedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
+      this.eulerianRemovedEdges = new Set((removedEdges || []).map(([a, b]) => Math.min(a, b) + ',' + Math.max(a, b)));
+      this.articulationPoints = [];
+      this.blocks = [];
       this.draw();
     }
 
@@ -291,6 +313,16 @@
               color = '#444460';
               width = 1;
             }
+          } else if (this.mode === HighlightMode.EulerianCycle) {
+            const normKey = Math.min(i, j) + ',' + Math.max(i, j);
+            if (this.eulerianRemovedEdges && this.eulerianRemovedEdges.has(normKey)) {
+              color = '#FF4444';
+              width = 3;
+              dash = [7, 5];
+            } else if (this.highlightedEdges.has(normKey)) {
+              color = '#64DC64';
+              width = 3;
+            }
           }
 
           ctx.strokeStyle = color;
@@ -363,6 +395,27 @@
         }
       }
 
+      if (this.mode === HighlightMode.EulerianCycle && this.eulerianAddedEdges) {
+        for (const key of this.eulerianAddedEdges) {
+          const parts = key.split(',');
+          const i = parseInt(parts[0], 10);
+          const j = parseInt(parts[1], 10);
+          if (Number.isNaN(i) || Number.isNaN(j) || i < 0 || j < 0 || i >= this.n || j >= this.n) continue;
+          if (this.adj && (this.adj[i][j] || this.adj[j][i])) continue;
+
+          const x1 = px[i].x, y1 = px[i].y;
+          const x2 = px[j].x, y2 = px[j].y;
+          ctx.strokeStyle = '#64DC64';
+          ctx.lineWidth = 3;
+          ctx.setLineDash([7, 5]);
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+      }
+
       // ---- Draw vertices ----
       for (let i = 0; i < this.n; i++) {
         let fill = 'rgb(173,216,230)';
@@ -376,6 +429,8 @@
           fill = 'rgb(255,100,100)';
         } else if (this.mode === HighlightMode.VertexCover && this.highlightedVertices.has(i)) {
           fill = 'rgb(170,100,220)';
+        } else if (this.mode === HighlightMode.EulerianCycle && this.highlightedVertices.has(i)) {
+          fill = 'rgb(100,220,100)';
         }
 
         ctx.beginPath();

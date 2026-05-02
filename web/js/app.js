@@ -16,6 +16,9 @@
   // Lab 4 state (Tab 7)
   let mstAdjMatrix = null;
 
+  // Lab 5 state (Tab 8)
+  let fundCycleData = null;   // CycleSpace.solve() result
+
   // Flow network state (Tab 6)
   let capacityMatrix = null;
   let costMatrix = null;
@@ -53,10 +56,10 @@
 
         // Clear highlights on plain-graph tabs (matching onTabChanged)
         if (graphCanvas) graphCanvas.setForceUndirectedView(false);
-        if (tab === 0 || tab === 1 || tab === 5 || tab === 6 || tab === 7) {
+        if (tab === 0 || tab === 1 || tab === 5 || tab === 6 || tab === 7 || tab === 8) {
           if (graphCanvas) graphCanvas.clearHighlights();
         }
-        if (tab === 7) {
+        if (tab === 7 || tab === 8) {
           if (graphCanvas) graphCanvas.setForceUndirectedView(true);
         }
 
@@ -125,6 +128,15 @@
     mstAdjMatrix = null;
     $('vcSourceMstRadio').disabled = true;
     document.querySelector('input[name="lab4VCSource"][value="full"]').checked = true;
+
+    // Clear Tab 8 (Лаб 5)
+    $('lab5Task1Text').textContent = '';
+    $('lab5Task1Table').innerHTML = '';
+    $('lab5Task2Text').textContent = '';
+    $('lab5Task2Table').innerHTML = '';
+    $('lab5CycleIndices').value = '';
+    $('lab5SymDiffText').textContent = '';
+    fundCycleData = null;
 
     // Display matrices
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
@@ -229,6 +241,15 @@
     mstAdjMatrix = null;
     $('vcSourceMstRadio').disabled = true;
     document.querySelector('input[name="lab4VCSource"][value="full"]').checked = true;
+
+    // Clear Tab 8 (Лаб 5)
+    $('lab5Task1Text').textContent = '';
+    $('lab5Task1Table').innerHTML = '';
+    $('lab5Task2Text').textContent = '';
+    $('lab5Task2Table').innerHTML = '';
+    $('lab5CycleIndices').value = '';
+    $('lab5SymDiffText').textContent = '';
+    fundCycleData = null;
 
     UIHelpers.displayMatrix('adjMatrix', graph.adjMatrix, 0, 'adjacency');
     UIHelpers.displayMatrix('weightMatrix', graph.weightMatrix, 0, 'weighted');
@@ -486,6 +507,15 @@
     hasFlowNetwork = false;
     lastMaxFlow = 0;
 
+    // Clear Tab 8 (Лаб 5)
+    $('lab5Task1Text').textContent = '';
+    $('lab5Task1Table').innerHTML = '';
+    $('lab5Task2Text').textContent = '';
+    $('lab5Task2Table').innerHTML = '';
+    $('lab5CycleIndices').value = '';
+    $('lab5SymDiffText').textContent = '';
+    fundCycleData = null;
+
     // Update weight type label
     const labels = { positive: 'Положительные', negative: 'Отрицательные', mixed: 'Смешанные' };
     $('dijkWeightTypeLabel').textContent = 'Тип весов: ' + (labels[weightType] || weightType);
@@ -532,6 +562,13 @@
     $('minCostFlowMatrix').innerHTML = '';
     hasFlowNetwork = false;
     lastMaxFlow = 0;
+    $('lab5Task1Text').textContent = '';
+    $('lab5Task1Table').innerHTML = '';
+    $('lab5Task2Text').textContent = '';
+    $('lab5Task2Table').innerHTML = '';
+    $('lab5CycleIndices').value = '';
+    $('lab5SymDiffText').textContent = '';
+    fundCycleData = null;
   }
 
   function onRearrangeUndirected() {
@@ -595,6 +632,13 @@
     $('minCostFlowMatrix').innerHTML = '';
     hasFlowNetwork = false;
     lastMaxFlow = 0;
+    $('lab5Task1Text').textContent = '';
+    $('lab5Task1Table').innerHTML = '';
+    $('lab5Task2Text').textContent = '';
+    $('lab5Task2Table').innerHTML = '';
+    $('lab5CycleIndices').value = '';
+    $('lab5SymDiffText').textContent = '';
+    fundCycleData = null;
   }
 
   // ---- Tab 5: Comparison ----
@@ -998,6 +1042,329 @@
     if (graphCanvas) graphCanvas.highlightVertexCover(res.cover, res.pickedEdges, res.removedEdges, mstEdgeSet);
   }
 
+  // ---- Tab 8: Lab 5 ----
+
+  function onLab5EulerianCycle() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    const n = graph.n;
+    if (n <= 1) { alert('Граф содержит ≤ 1 вершины — эйлеров цикл не применим.'); return; }
+
+    // Symmetrize (same pattern as onFindBiComp)
+    const adj = graph.adjMatrix.map(row => row.slice());
+    if (graph.directed) {
+      for (let i = 0; i < n; i++)
+        for (let j = i + 1; j < n; j++)
+          if (adj[i][j] || adj[j][i]) adj[i][j] = adj[j][i] = 1;
+    }
+    if (graphCanvas) graphCanvas.setForceUndirectedView(true);
+
+    if (n === 2 && adj[0][1]) {
+      $('lab5Task1Text').textContent =
+        'Алексей Владимирович, Здравствуйте! 😁\n\n' +
+        'Граф состоит из двух вершин и одного ребра.\n' +
+        'Степени вершин: deg(0) = 1, deg(1) = 1.\n\n' +
+        'Эйлеров цикл не существует, потому что обе вершины имеют нечётную степень.\n' +
+        'Существует только эйлеров путь: 0 → 1.';
+      UIHelpers.displayMatrix('lab5Task1Table', adj, 0, 'adjacency');
+      if (graphCanvas) graphCanvas.clearHighlights();
+      return;
+    }
+
+    const res = Eulerian.solve(adj);
+
+    let text = '';
+    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+    if (res.isEulerian) {
+      text += 'Граф является эйлеровым (без модификаций).\n\n';
+    } else {
+      text += 'Граф не является эйлеровым. Выполнены модификации:\n';
+      for (const m of res.modifications) text += '  • ' + m + '\n';
+      text += '\n';
+    }
+
+    if (!res.found) {
+      text += res.failureReason || 'Граф пуст (нет рёбер) — эйлеров цикл не существует.';
+    } else {
+      text += 'Эйлеров цикл:\n  ' + res.cycle.join(' → ');
+      text += '\nДлина цикла: ' + (res.cycle.length - 1) + ' рёбер.';
+    }
+
+    $('lab5Task1Text').textContent = text;
+
+    // Display the MODIFIED adjacency matrix (includes added/removed edges)
+    const displayAdj = res.modifiedAdj || adj;
+    UIHelpers.displayMatrix('lab5Task1Table', displayAdj, 0, 'adjacency');
+
+    if (res.found) {
+      const cycleEdges = [];
+      for (let i = 0; i + 1 < res.cycle.length; i++)
+        cycleEdges.push([res.cycle[i], res.cycle[i + 1]]);
+      UIHelpers.highlightPath('lab5Task1Table', cycleEdges);
+
+      const canvasAddedEdges = [];
+      const canvasRemovedEdges = [];
+      for (let i = 0; i < n; i++) {
+        for (let j = i + 1; j < n; j++) {
+          const wasEdge = !!adj[i][j];
+          const isEdge = !!displayAdj[i][j];
+          if (!wasEdge && isEdge) canvasAddedEdges.push([i, j]);
+          if (wasEdge && !isEdge) canvasRemovedEdges.push([i, j]);
+        }
+      }
+
+      if (graphCanvas) graphCanvas.highlightEulerianCycle(
+        res.cycle,
+        canvasAddedEdges,
+        canvasRemovedEdges
+      );
+    } else {
+      if (graphCanvas) graphCanvas.clearHighlights();
+    }
+  }
+
+  function onLab5BuildCycleSpace() {
+    if (!hasGraph) { alert('Сначала сгенерируйте граф!'); return; }
+    const n = graph.n;
+    if (n <= 1) { alert('Граф содержит ≤ 1 вершины — система циклов не применима.'); return; }
+
+    // Symmetrize both matrices (same as symmetrizeWeight helper used in Lab 4)
+    const [adj, w] = symmetrizeWeight(graph.adjMatrix, graph.weightMatrix);
+    if (graphCanvas) graphCanvas.setForceUndirectedView(true);
+
+    if (n === 2 && adj[0][1]) {
+      fundCycleData = { cycles: [] };
+      $('lab5Task2Text').textContent =
+        'Алексей Владимирович, Здравствуйте! 😁\n\n' +
+        'Граф состоит из двух вершин и одного ребра.\n' +
+        'Это дерево: нет рёбер вне МОД, поэтому фундаментальная система циклов пуста.\n\n' +
+        'Циклы отсутствуют.\n' +
+        'Симметрическую разность строить не из чего.';
+      UIHelpers.displayMatrix('lab5Task2Table', w, 0, 'weighted');
+      UIHelpers.highlightPath('lab5Task2Table', [[0, 1], [1, 0]]);
+      $('lab5CycleIndices').value = '';
+      $('lab5SymDiffText').textContent = '';
+      $('lab5SymDiffBtn').disabled = true;
+      if (graphCanvas) graphCanvas.highlightMSTEdges(new Set(['0,1']));
+      return;
+    }
+
+    const mstForCanvas = MSTPrim.solve(adj, w);
+    if (graphCanvas && mstForCanvas.connected) {
+      const mstSet = new Set(mstForCanvas.edges.map(([u, v]) => Math.min(u, v) + ',' + Math.max(u, v)));
+      graphCanvas.highlightMSTEdges(mstSet);
+    } else if (graphCanvas) {
+      graphCanvas.clearHighlights();
+    }
+
+    fundCycleData = CycleSpace.solve(adj, w);
+
+    if (!fundCycleData.cycles.length) {
+      let text = '';
+      if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+      if (!mstForCanvas.connected) {
+        text += 'Граф несвязный — МОД не существует, поэтому фундаментальная система циклов не строится.';
+        $('lab5Task2Table').innerHTML = '';
+      } else {
+        text += 'Ко-дерево не содержит рёбер.\n';
+        text += 'МОД совпадает с исходным графом, то есть исходный граф является деревом.\n';
+        text += 'Фундаментальная система циклов пуста.';
+        UIHelpers.displayMatrix('lab5Task2Table', w, 0, 'weighted');
+        const mstEdgePairs = [];
+        for (const [u, v] of mstForCanvas.edges) {
+          mstEdgePairs.push([u, v]);
+          mstEdgePairs.push([v, u]);
+        }
+        UIHelpers.highlightPath('lab5Task2Table', mstEdgePairs);
+      }
+      $('lab5Task2Text').textContent = text;
+      $('lab5CycleIndices').value = '';
+      $('lab5SymDiffText').textContent = '';
+      $('lab5SymDiffBtn').disabled = true;
+      return;
+    }
+
+    let text = '';
+    if (graph.directed) text += 'Граф рассматривается как неориентированный.\n';
+    text += 'Число рёбер в ко-дереве: ' + fundCycleData.cycles.length +
+            ' ==> Число фундаментальных циклов: ' + fundCycleData.cycles.length + '\n\n';
+    for (let i = 0; i < fundCycleData.cycles.length; i++) {
+      const cyc = fundCycleData.cycles[i];
+      const added = cyc.cotreeEdge || cyc.edges[cyc.edges.length - 1];
+      const orderedEdges = [];
+      for (let k = 0; k + 1 < cyc.vertices.length; k++)
+        orderedEdges.push([cyc.vertices[k], cyc.vertices[k + 1]]);
+      text += 'Цикл ' + i + ' (при добавлении ребра (' + added[0] + ', ' + added[1] + ')): ' +
+              cyc.vertices.join(' → ') + '\n';
+      text += '  Рёбра: ' + orderedEdges.map(function(e) { return '(' + e[0] + ', ' + e[1] + ')'; }).join(', ') + '\n';
+    }
+
+    $('lab5Task2Text').textContent = text;
+    UIHelpers.displayMatrix('lab5Task2Table', w, 0, 'weighted');
+
+    // Highlight all cycle edges in the weight matrix (both directions)
+    const allEdges = [];
+    for (const cyc of fundCycleData.cycles)
+      for (const [u, v] of cyc.edges) { allEdges.push([u, v]); allEdges.push([v, u]); }
+    UIHelpers.highlightPath('lab5Task2Table', allEdges);
+
+    $('lab5CycleIndices').value = '';
+    if (fundCycleData.cycles.length === 1) {
+      $('lab5SymDiffBtn').disabled = true;
+      $('lab5SymDiffText').textContent =
+        'Фундаментальная система содержит только один цикл.\n' +
+        'Другие циклы через симметрическую разность получить нельзя.\n' +
+        'Всего ненулевых циклов в пространстве циклов: 1.\n' +
+        'Количество непустых комбинаций пространства циклов: 2^1 - 1 = 1.';
+    } else {
+      $('lab5SymDiffBtn').disabled = false;
+      $('lab5SymDiffText').textContent = '';
+    }
+  }
+
+  function onLab5ComputeSymDiff() {
+    if (!fundCycleData || !fundCycleData.cycles.length) {
+      alert('Сначала постройте фундаментальную систему циклов!');
+      return;
+    }
+
+    if (fundCycleData.cycles.length === 1) {
+      alert('Фундаментальная система содержит только один цикл. Другие циклы через симметрическую разность получить нельзя.');
+      $('lab5SymDiffText').textContent =
+        'Фундаментальная система содержит только один цикл.\n' +
+        'Другие циклы через симметрическую разность получить нельзя.\n' +
+        'Всего ненулевых циклов в пространстве циклов: 1.\n' +
+        'Количество непустых комбинаций пространства циклов: 2^1 - 1 = 1.';
+      return;
+    }
+
+    const raw = $('lab5CycleIndices').value.trim();
+    if (!raw) { alert('Введите хотя бы один индекс цикла.'); return; }
+
+    const parts = raw.split(',').map(function(s) { return s.trim(); });
+    const selectedIndices = [];
+    const invalid = [];
+    for (const p of parts) {
+      const idx = parseInt(p, 10);
+      if (isNaN(idx) || idx < 0 || idx >= fundCycleData.cycles.length) {
+        invalid.push(p);
+      } else {
+        selectedIndices.push(idx);
+      }
+    }
+
+    if (invalid.length > 0) {
+      alert('Неверные индексы: ' + invalid.join(', ') +
+            '\nДопустимый диапазон: 0..' + (fundCycleData.cycles.length - 1));
+      return;
+    }
+
+    if (selectedIndices.length === 1) {
+      const idx = selectedIndices[0];
+      const cyc = fundCycleData.cycles[idx];
+      const orderedEdges = [];
+      for (let k = 0; k + 1 < cyc.vertices.length; k++)
+        orderedEdges.push([cyc.vertices[k], cyc.vertices[k + 1]]);
+
+      let text = 'Выбран один цикл: { ' + idx + ' }\n';
+      text += 'Интерпретация: C' + idx + ' Δ ∅ = C' + idx + '.\n';
+      text += 'Это исходный фундаментальный цикл, новый цикл не образуется.\n\n';
+      text += 'Цикл ' + idx + ': ' + cyc.vertices.join(' → ') + '\n';
+      text += 'Рёбра: ' + orderedEdges.map(function(e) { return '(' + e[0] + ', ' + e[1] + ')'; }).join(', ');
+      $('lab5SymDiffText').textContent = text;
+      return;
+    }
+
+    const symDiff = CycleSpace.symmetricDifference(fundCycleData, selectedIndices);
+
+    const cycleExpression = selectedIndices.map(function(idx) { return 'C' + idx; }).join(' Δ ');
+    let text = cycleExpression + '\n';
+    if (symDiff.length === 0) {
+      text += 'Симметричная разность пуста — все рёбра встречаются чётное число раз.';
+    } else {
+      const cycles = decomposeSymDiffToCycles(symDiff);
+      for (let i = 0; i < cycles.length; i++) {
+        const vertices = cycles[i];
+        const orderedEdges = [];
+        for (let k = 0; k + 1 < vertices.length; k++)
+          orderedEdges.push([vertices[k], vertices[k + 1]]);
+        text += 'Цикл ' + (i + 1) + ': ' + vertices.join(' → ') + '\n';
+        text += 'Рёбра: ' + orderedEdges.map(function(e) { return '(' + e[0] + ', ' + e[1] + ')'; }).join(', ');
+        if (i + 1 < cycles.length) text += '\n';
+      }
+    }
+
+    $('lab5SymDiffText').textContent = text;
+  }
+
+  function decomposeSymDiffToCycles(edges) {
+    const keyOf = function(a, b) {
+      return Math.min(a, b) + ',' + Math.max(a, b);
+    };
+    const parseKey = function(key) {
+      return key.split(',').map(function(x) { return parseInt(x, 10); });
+    };
+    const remaining = new Set(edges.map(function(e) { return keyOf(e[0], e[1]); }));
+    const cycles = [];
+
+    const buildAdj = function() {
+      const adj = new Map();
+      for (const key of remaining) {
+        const parts = parseKey(key);
+        const u = parts[0], v = parts[1];
+        if (!adj.has(u)) adj.set(u, []);
+        if (!adj.has(v)) adj.set(v, []);
+        adj.get(u).push(v);
+        adj.get(v).push(u);
+      }
+      for (const list of adj.values()) list.sort(function(a, b) { return a - b; });
+      return adj;
+    };
+
+    const findCycle = function() {
+      const adj = buildAdj();
+      if (remaining.size === 0) return [];
+
+      const first = parseKey(Array.from(remaining).sort()[0])[0];
+      const visited = new Set();
+      const parent = new Map();
+
+      const dfs = function(v, p) {
+        visited.add(v);
+        const neighbors = adj.get(v) || [];
+        for (const u of neighbors) {
+          if (!remaining.has(keyOf(v, u))) continue;
+          if (u === p) continue;
+          if (!visited.has(u)) {
+            parent.set(u, v);
+            const found = dfs(u, v);
+            if (found.length) return found;
+          } else {
+            const chain = [];
+            for (let x = v; x !== u; x = parent.get(x)) {
+              chain.push(x);
+              if (!parent.has(x)) return [];
+            }
+            chain.reverse();
+            return [u].concat(chain, [u]);
+          }
+        }
+        return [];
+      };
+
+      return dfs(first, -1);
+    };
+
+    while (remaining.size > 0) {
+      const cycle = findCycle();
+      if (!cycle.length) break;
+      cycles.push(cycle);
+      for (let i = 0; i + 1 < cycle.length; i++)
+        remaining.delete(keyOf(cycle[i], cycle[i + 1]));
+    }
+
+    return cycles;
+  }
+
   // ---- Init ----
   document.addEventListener('DOMContentLoaded', function () {
     setupTabs();
@@ -1022,6 +1389,9 @@
     $('lab4CountTreesBtn').addEventListener('click', onLab4CountTrees);
     $('lab4BuildMSTBtn').addEventListener('click', onLab4BuildMST);
     $('lab4VertexCoverBtn').addEventListener('click', onLab4VertexCover);
+    $('lab5EulerianBtn').addEventListener('click', onLab5EulerianCycle);
+    $('lab5CycleSpaceBtn').addEventListener('click', onLab5BuildCycleSpace);
+    $('lab5SymDiffBtn').addEventListener('click', onLab5ComputeSymDiff);
   });
 
 })();

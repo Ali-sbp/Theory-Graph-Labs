@@ -20,6 +20,7 @@
         <button class="tab-btn" data-tab="5">Сравнение алгоритмов</button>
         <button class="tab-btn" data-tab="6">Поток</button>
         <button class="tab-btn" data-tab="7">Лаб 4</button>
+        <button class="tab-btn" data-tab="8">Лаб 5</button>
       </nav>
 
       <div id="tab-panels">
@@ -264,6 +265,40 @@
 
         </div>
 
+        <!-- ======== Tab 8: Лаб 5 ======== -->
+        <div class="tab-panel" id="panel-8">
+
+          <!-- Задание 1: Эйлеров цикл -->
+          <h3 class="section-heading">Задание 1: Эйлеров цикл (алгоритм Флери)</h3>
+          <div class="btn-row">
+            <button class="btn" id="lab5EulerianBtn">Найти эйлеров цикл</button>
+          </div>
+          <div id="lab5Task1Text" class="text-output"></div>
+          <div class="matrix-label">Матрица смежности (рёбра эйлерова цикла выделены)</div>
+          <div id="lab5Task1Table"></div>
+
+          <!-- Задание 2: ФСЦ -->
+          <h3 class="section-heading">Задание 2: Фундаментальная система циклов</h3>
+          <div class="btn-row">
+            <button class="btn" id="lab5CycleSpaceBtn">Построить ФСЦ (МОД + циклы)</button>
+          </div>
+          <div id="lab5Task2Text" class="text-output"></div>
+          <div class="matrix-label">Матрица весов МОД (нетрейные рёбра отмечены)</div>
+          <div id="lab5Task2Table"></div>
+
+          <!-- Задание 2 (продолжение): Симметричная разность -->
+          <h3 class="section-heading">Задание 2 (продолжение): Симметричная разность</h3>
+          <div class="form-row">
+            <label for="lab5CycleIndices">Индексы циклов (через запятую, с 0):</label>
+            <input type="text" id="lab5CycleIndices" placeholder="например: 0,1,2">
+          </div>
+          <div class="btn-row">
+            <button class="btn" id="lab5SymDiffBtn">Вычислить симметричную разность</button>
+          </div>
+          <div id="lab5SymDiffText" class="text-output"></div>
+
+        </div><!-- /panel-8 -->
+
       </div><!-- /tab-panels -->
     </div><!-- /sidebar -->
 
@@ -286,6 +321,8 @@
   <script src="js/spanningtreecount.js"></script>
   <script src="js/mstprim.js"></script>
   <script src="js/vertexcover.js"></script>
+  <script src="js/eulerian.js"></script>
+  <script src="js/cyclespace.js"></script>
   <script src="js/graph-canvas.js"></script>
   <script src="js/ui-helpers.js"></script>
   <script src="js/app.js"></script>
